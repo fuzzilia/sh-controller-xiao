@@ -1,5 +1,6 @@
 #include <Adafruit_DotStar.h>
 #include <bluefruit.h>
+#include <InternalFileSystem.h>
 #include "KeyService.h"
 #include "KeyConfigService.h"
 #include "KeyConfigLoader.h"
@@ -37,6 +38,8 @@ void setup() {
   
   pinMode(SELECT_PIN, INPUT_PULLUP);
   delay(1000);
+
+  InternalFS.begin();
 
   isConfigMode = digitalRead(SELECT_PIN) == LOW;
 
