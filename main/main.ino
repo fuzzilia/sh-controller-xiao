@@ -6,7 +6,7 @@
 #include "KeyConfigLoader.h"
 #include "ButtonManager.h"
 
-#define SELECT_PIN PIN_BUTTON1
+#define SELECT_PIN PIN_A0
 
 Adafruit_DotStar strip(1, PIN_DOTSTAR_DATA, PIN_DOTSTAR_CLOCK, DOTSTAR_BRG);
 BLEDis bledis;
@@ -37,7 +37,6 @@ void setup() {
   while (!Serial) delay(10);   // for nrf52840 with native usb
   
   pinMode(SELECT_PIN, INPUT_PULLUP);
-  delay(1000);
 
   InternalFS.begin();
 
@@ -60,23 +59,21 @@ void setup() {
 
   Serial.println("config loaded");
   Serial.flush();
-//
-//  Bluefruit.begin();
-//  Bluefruit.setTxPower(4);    // Check bluefruit.h for supported values
-//  Bluefruit.setName("SH-CON2");
-//
-//  // // Configure and Start Device Information Service
-//  bledis.setManufacturer("FUZZILIA");
-//  bledis.setModel("SH-CONTROLLER2");
-//  bledis.begin();
-//
-//  startAdv();
+
+ Bluefruit.begin();
+ Bluefruit.setTxPower(4);    // Check bluefruit.h for supported values
+ Bluefruit.setName("SH-CON2");
+
+ // // Configure and Start Device Information Service
+ bledis.setManufacturer("FUZZILIA");
+ bledis.setModel("SH-CONTROLLER2");
+ bledis.begin();
+
+ startAdv();
 }
 
 void startAdv(void)
-{  
-  Serial.println("config startAdv");
-
+{
   // Advertising packet
   Bluefruit.Advertising.addFlags(BLE_GAP_ADV_FLAGS_LE_ONLY_GENERAL_DISC_MODE);
   Bluefruit.Advertising.addTxPower();
