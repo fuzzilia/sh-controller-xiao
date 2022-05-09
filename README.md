@@ -2,7 +2,7 @@
 
 このプログラム、サークルfuzziliaがコミックマーケット参加に合わせて作成中のデジタルお絵かき用キー入力デバイス、通称左手デバイスのファームウェアです。
 対象のSoCはnRF52840で、特にAdafruit ItsyBitsy nRF52840 Express開発ボードに合わせて実装しています。プログラムのビルド、書き込みはArduinoで行います。
-ESP版は https://github.com/fuzzilia/sh-controller です。
+ESP版は https://github.com/fuzzilia/sh-controller です。(現在非公開となっています。)
 
 これを設定するためのPC側のアプリケーション https://github.com/fuzzilia/sh-config とセットで機能します。
 
@@ -14,7 +14,7 @@ ESP版は https://github.com/fuzzilia/sh-controller です。
     - [Microsoftが出してるやつ](https://marketplace.visualstudio.com/items?itemName=vsciot-vscode.vscode-arduino)
 - VSCodeの設定(settings.json)に下記を追記
     - ```json
-      "arduino.additionalUrls": ["https://www.adafruit.com/package_adafruit_index.json"]
+      "arduino.additionalUrls": ["https://adafruit.github.io/arduino-board-index/package_adafruit_index.json"]
       ```
     - arduino.additionalUrls : adafruit製ボードを追加できるようにするため。
 - コマンドパレットから Arduino Board Managerを呼び出し、Adafruit nRF52を選択、Install
