@@ -1,8 +1,6 @@
-#ifndef FUZZILIA_KEY_CONFIG_SERVICE_H
-#define FUZZILIA_KEY_CONFIG_SERVICE_H
+#ifndef SH_CONTROLLER_KEY_CONFIG_SERVICE_H
+#define SH_CONTROLLER_KEY_CONFIG_SERVICE_H
 
-#include "KeyConfig.h"
+void initKeyConfigService();
 
-void initKeyConfigService(const KeyConfig &keyConfig, boolean isReadonly);
-
-#endif // FUZZILIA_KEY_CONFIG_SERVICE_H
+#endif // SH_CONTROLLER_KEY_CONFIG_SERVICE_H

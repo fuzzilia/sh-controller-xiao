@@ -12,41 +12,37 @@ void initKeyService()
 
 hid_keyboard_report_t report;
 
-void setKeyToReport(Key key)
+void setKeyToReport(const KeyboardValue &key)
 {
     varclr(&report);
-    report.keycode[0] = key.key;
-    report.modifier =
-        (key.modifer.control << 0) |
-        (key.modifer.shift << 1) |
-        (key.modifer.alt << 2) |
-        (key.modifer.gui << 3);
+    report.keycode[0] = key.keyCode();
+    report.modifier = key.modifier();
 }
 
-void printSendKey(Key key)
+void printSendKey(const KeyboardValue &key)
 {
     Serial.print("send key");
-    if (key.modifer.control)
+    if (key.hasCtrl())
     {
-        Serial.print("[control]");
+        Serial.print("[ctrl]");
     }
-    if (key.modifer.shift)
+    if (key.hasShift())
     {
         Serial.print("[shift]");
     }
-    if (key.modifer.alt)
+    if (key.hasAlt())
     {
         Serial.print("[alt]");
     }
-    if (key.modifer.gui)
+    if (key.hasGui())
     {
         Serial.print("[gui]");
     }
-    Serial.print(key.key);
+    Serial.print(key.keyCode());
     Serial.print("\n");
 }
 
-void sendKey(Key key)
+void sendKey(KeyboardValue key)
 {
     printSendKey(key);
     setKeyToReport(key);

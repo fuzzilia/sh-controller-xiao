@@ -1,63 +1,54 @@
+#include <Adafruit_MPR121.h>
 #include <Adafruit_DotStar.h>
 #include <bluefruit.h>
 #include <InternalFileSystem.h>
+#include <array>
+#include "src/lib/SHController.h"
+#include "CL3GD20.h"
+#include "ConfigLoader.h"
 #include "KeyService.h"
 #include "KeyConfigService.h"
-#include "KeyConfigLoader.h"
-#include "ButtonManager.h"
 
-#define SELECT_PIN PIN_A0
+// TODO 仮置き
+#define SELECT_PIN 1
 
 Adafruit_DotStar strip(1, PIN_DOTSTAR_DATA, PIN_DOTSTAR_CLOCK, DOTSTAR_BRG);
-BLEDis bledis;
-bool isConfigMode = false;
-uint8_t buttonPins[] = {
-    PIN_BUTTON1,
-    PIN_A0,
-    PIN_A1,
-    PIN_A2,
-    PIN_A3,
-    PIN_A4,
-    PIN_A5,
-    11,
-    12,
-    13};
 
-bool pinIsOn(uint8_t pin)
-{
-  // Serial.print("Pin[");
-  // Serial.print(pin);
-  // Serial.print("] : ");
-  bool isOn = digitalRead(pin) == 0;
-  // Serial.print(isOn);
-  // Serial.print("\n");
-  return isOn;
+CL3GD20 l2gd20; // ジャイロセンサー.
+
+BLEDis bledis;
+
+static SHController *sh_controller = nullptr;
+static bool isConfigMode = false;
+
+static bool ButtonIsOn(int button_index) {
+  return true;
 }
 
-ButtonManager buttonManager(buttonPins, sizeof(buttonPins), pinIsOn, sendKey);
-KeyConfig keyConfig;
+static float StickValue(int, TwoDimension dimension) {
+  // analogRead(A3)
+  // analogRead(A4)
+  // if (joycon_packet) {
+  //     auto stick_value = joycon_packet->readStickValue();
+  //     switch (dimension) {
+  //         case TwoDimension::X:
+  //             return CapStickValue((float) (stick_value.horizontal - joycon_stick_center.horizontal) / 1900.0f);
+  //         case TwoDimension::Y:
+  //             return CapStickValue((float) (stick_value.vertical - joycon_stick_center.vertical) / 1900.0f);
+  //     }
+  // }
+  return 0.0f;
+}
 
-void setup()
-{
-  strip.begin();
-  strip.setBrightness(2);
-  strip.setPixelColor(0, 255, 0, 0);
-  strip.show();
+std::vector<MotionSensorValue> MotionSensorValues() {
+  return {
+    MotionSensorValue{.time_span_s = 1.0f / 60 / 3, .gyro = {.x = 0.0f, .y = 0.0f, .z = 0.0f}},
+    MotionSensorValue{.time_span_s = 1.0f / 60 / 3, .gyro = {.x = 0.0f, .y = 0.0f, .z = 0.0f}},
+    MotionSensorValue{.time_span_s = 1.0f / 60 / 3, .gyro = {.x = 0.0f, .y = 0.0f, .z = 0.0f}},
+  };
+}
 
-  Serial.begin(115200);
-  while (!Serial)
-    delay(10); // for nrf52840 with native usb
-
-  pinMode(SELECT_PIN, INPUT_PULLUP);
-  for (int i = 0; i < sizeof(buttonPins); i++)
-  {
-    pinMode(buttonPins[i], INPUT_PULLUP);
-  }
-
-  InternalFS.begin();
-
-  isConfigMode = digitalRead(SELECT_PIN) == LOW;
-
+static void showMode(bool isConfigMode) {
   strip.begin();
   strip.setBrightness(2);
   if (isConfigMode)
@@ -72,26 +63,9 @@ void setup()
   }
   strip.show();
   Serial.flush();
-
-  keyConfig = KeyConfigLoader::load();
-  buttonManager.setKeyConfig(keyConfig);
-
-  Serial.println("config loaded");
-  Serial.flush();
-
-  Bluefruit.begin();
-  Bluefruit.setTxPower(4); // Check bluefruit.h for supported values
-  Bluefruit.setName("SH-CON2");
-
-  // // Configure and Start Device Information Service
-  bledis.setManufacturer("FUZZILIA");
-  bledis.setModel("SH-CONTROLLER2");
-  bledis.begin();
-
-  startAdv();
 }
 
-void startAdv(void)
+static void startAdv(void)
 {
   if (!isConfigMode)
   {
@@ -99,7 +73,7 @@ void startAdv(void)
   }
   else
   {
-    initKeyConfigService(keyConfig, !isConfigMode);
+    initKeyConfigService();
   }
 
   // Advertising packet
@@ -123,12 +97,37 @@ void startAdv(void)
   Bluefruit.Advertising.start(0);             // 0 = Don't stop advertising after n seconds
 }
 
-void loop()
-{
-  delay(20);
+void setup() {
+  strip.begin();
+  strip.setBrightness(2);
+  strip.setPixelColor(0, 255, 0, 0);
+  strip.show();
+  
+	Serial.begin(115200);
+  while ( !Serial ) delay(10);   // for nrf52840 with native usb
 
-  if (!isConfigMode)
-  {
-    buttonManager.checkButtonState();
-  }
+  analogReadResolution(12);
+
+  InternalFS.begin();
+  isConfigMode = digitalRead(SELECT_PIN) == LOW;
+
+  showMode(isConfigMode);
+
+  auto config = ConfigLoader::load();
+  sh_controller = new SHController(std::move(config), ButtonIsOn, StickValue, MotionSensorValues);
+
+  Bluefruit.begin();
+  Bluefruit.setTxPower(4); // Check bluefruit.h for supported values
+  Bluefruit.setName("SH-CON2");
+
+  // // Configure and Start Device Information Service
+  bledis.setManufacturer("FUZZILIA");
+  bledis.setModel("SH-CONTROLLER2");
+  bledis.begin();
+
+  startAdv();
+}
+
+void loop() {
+  delay(1000);
 }
