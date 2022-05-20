@@ -8,6 +8,7 @@
 #include "ConfigLoader.h"
 #include "KeyService.h"
 #include "KeyConfigService.h"
+#include "ButtonMatrix.h"
 
 // TODO 仮置き
 #define SELECT_PIN 1
@@ -20,10 +21,6 @@ BLEDis bledis;
 
 static SHController *sh_controller = nullptr;
 static bool isConfigMode = false;
-
-static bool ButtonIsOn(int button_index) {
-  return true;
-}
 
 static float StickValue(int, TwoDimension dimension) {
   // analogRead(A3)
