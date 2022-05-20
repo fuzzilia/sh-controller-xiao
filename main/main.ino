@@ -10,9 +10,6 @@
 #include "KeyConfigService.h"
 #include "ButtonMatrix.h"
 
-// TODO 仮置き
-#define SELECT_PIN 1
-
 Adafruit_DotStar strip(1, PIN_DOTSTAR_DATA, PIN_DOTSTAR_CLOCK, DOTSTAR_BRG);
 
 CL3GD20 l2gd20; // ジャイロセンサー.
@@ -104,9 +101,10 @@ void setup() {
   while ( !Serial ) delay(10);   // for nrf52840 with native usb
 
   analogReadResolution(12);
+  InitPinsForButton();
 
   InternalFS.begin();
-  isConfigMode = digitalRead(SELECT_PIN) == LOW;
+  isConfigMode = ConfigButtonIsOn();
 
   showMode(isConfigMode);
 
