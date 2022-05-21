@@ -1,6 +1,8 @@
 #ifndef SH_JOYCON_SHVALUE_H
 #define SH_JOYCON_SHVALUE_H
 
+#include <stdint.h>
+
 template<class T>
 struct PositiveAndNegative {
     T positive;

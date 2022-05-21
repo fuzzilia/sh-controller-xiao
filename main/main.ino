@@ -9,6 +9,7 @@
 #include "KeyService.h"
 #include "KeyConfigService.h"
 #include "ButtonMatrix.h"
+#include "AnalogStick.h"
 
 Adafruit_DotStar strip(1, PIN_DOTSTAR_DATA, PIN_DOTSTAR_CLOCK, DOTSTAR_BRG);
 
@@ -18,21 +19,6 @@ BLEDis bledis;
 
 static SHController *sh_controller = nullptr;
 static bool isConfigMode = false;
-
-static float StickValue(int, TwoDimension dimension) {
-  // analogRead(A3)
-  // analogRead(A4)
-  // if (joycon_packet) {
-  //     auto stick_value = joycon_packet->readStickValue();
-  //     switch (dimension) {
-  //         case TwoDimension::X:
-  //             return CapStickValue((float) (stick_value.horizontal - joycon_stick_center.horizontal) / 1900.0f);
-  //         case TwoDimension::Y:
-  //             return CapStickValue((float) (stick_value.vertical - joycon_stick_center.vertical) / 1900.0f);
-  //     }
-  // }
-  return 0.0f;
-}
 
 std::vector<MotionSensorValue> MotionSensorValues() {
   return {
@@ -102,6 +88,7 @@ void setup() {
 
   analogReadResolution(12);
   InitPinsForButton();
+  InitPinsForStick();
 
   InternalFS.begin();
   isConfigMode = ConfigButtonIsOn();
@@ -124,5 +111,7 @@ void setup() {
 }
 
 void loop() {
-  delay(1000);
+  delay(20);
+  RefreshStickValue();
+  sh_controller->tick();
 }
