@@ -2,8 +2,8 @@
 
 #include "Arduino.h"
 
-#define X_INPUT_PIN PIN_A3
-#define Y_INPUT_PIN PIN_A4
+#define X_INPUT_PIN PIN_A4
+#define Y_INPUT_PIN PIN_A3
 
 #define SENSOR_VALUE_MARGIN 64
 // 12bit 解像度
