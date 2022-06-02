@@ -188,6 +188,7 @@ private:
     std::vector<RotateStickConfig> m_rotate_stick_configs;
     std::vector<FourButtonStickConfig> m_four_button_stick_configs;
     std::vector<EightButtonStickConfig> m_eight_button_stick_configs;
+    bool m_needsSensorInput;
 
 public:
     SHConfig(uint8_t *data);
@@ -240,6 +241,10 @@ public:
 
     const EightButtonStickConfig &EightButtonStickConfigAt(uint16_t index) const {
         return m_eight_button_stick_configs[index];
+    }
+
+    bool NeedsSensorInput() const {
+        return m_needsSensorInput;
     }
 
     KeypadId GetKeypadId() const {

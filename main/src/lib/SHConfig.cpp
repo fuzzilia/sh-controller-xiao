@@ -152,6 +152,7 @@ uint8_t SHConfig::StickBlock::ReferenceIndex() const {
 
 SHConfig::SHConfig(uint8_t *data) {
     DataReader reader(data);
+    m_needsSensorInput = false;
 
     auto version = reader.ReadUint16();
     if (version != 1) {
@@ -215,6 +216,7 @@ SHConfig::SHConfig(uint8_t *data) {
                         break;
                     }
                     case ButtonBlockType::Gesture: {
+                        m_needsSensorInput = true;
                         uint8_t index = m_gesture_button_configs.size();
                         bool x_is_active = header & 0x01;
                         bool y_is_active = header & 0x02;
@@ -235,6 +237,7 @@ SHConfig::SHConfig(uint8_t *data) {
                         break;
                     }
                     case ButtonBlockType::Rotation: {
+                        m_needsSensorInput = true;
                         uint8_t index = m_rotate_button_configs.size();
                         ThreeDimensionValue<uint8_t> split_size = {
                                 .x = reader.ReadUint8(),

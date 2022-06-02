@@ -3,6 +3,7 @@
 #include <bluefruit.h>
 #include <InternalFileSystem.h>
 #include <array>
+#include "FreeRTOS.h"
 #include "src/lib/SHController.h"
 #include "CL3GD20.h"
 #include "ConfigLoader.h"
@@ -11,11 +12,17 @@
 #include "ButtonMatrix.h"
 #include "AnalogStick.h"
 
+#define TICK_PER_SEC 60
+#define READ_MOTION_PER_TICK 3
+
 Adafruit_DotStar strip(1, PIN_DOTSTAR_DATA, PIN_DOTSTAR_CLOCK, DOTSTAR_BRG);
 
-CL3GD20 l2gd20; // ジャイロセンサー.
+static CL3GD20 *l2gd20 = nullptr; // ジャイロセンサー.
 
 BLEDis bledis;
+
+TimerHandle_t tickTimer;
+static int readMotionCount = 0;
 
 static SHController *sh_controller = nullptr;
 static bool isConfigMode = false;
@@ -77,6 +84,16 @@ static void startAdv(void)
   Bluefruit.Advertising.start(0);             // 0 = Don't stop advertising after n seconds
 }
 
+void Tick(TimerHandle_t xTimer){
+  // ジャイロセンサーの読み取り処理 + コントローラーの定期処理
+  readMotionCount++;
+  if (readMotionCount >= READ_MOTION_PER_TICK) {
+    RefreshStickValue();
+    sh_controller->tick();
+    readMotionCount = 0;
+  }
+}
+
 void setup() {
   strip.begin();
   strip.setBrightness(2);
@@ -108,10 +125,14 @@ void setup() {
   bledis.begin();
 
   startAdv();
+  if (sh_controller->config().NeedsSensorInput()) {
+    l2gd20 = new CL3GD20();
+  }
+
+  tickTimer = xTimerCreate("Tick", ms2tick(1000) / TICK_PER_SEC / READ_MOTION_PER_TICK, pdTRUE , 0, Tick);
 }
 
 void loop() {
-  delay(20);
-  RefreshStickValue();
-  sh_controller->tick();
+  // こっちのloopではなにもしない。
+  delay(10000);
 }
