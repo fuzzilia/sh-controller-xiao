@@ -11,6 +11,7 @@
 #include "KeyConfigService.h"
 #include "ButtonMatrix.h"
 #include "AnalogStick.h"
+#include "nrf_rng.h"
 
 #define TICK_PER_SEC 60
 #define READ_MOTION_PER_TICK 3
@@ -33,6 +34,23 @@ std::vector<MotionSensorValue> MotionSensorValues() {
     MotionSensorValue{.time_span_s = 1.0f / 60 / 3, .gyro = {.x = 0.0f, .y = 0.0f, .z = 0.0f}},
     MotionSensorValue{.time_span_s = 1.0f / 60 / 3, .gyro = {.x = 0.0f, .y = 0.0f, .z = 0.0f}},
   };
+}
+
+static void GenerateRandomAddress(ble_gap_addr_t &addr)
+{
+  addr.addr_id_peer = 0;
+  addr.addr_type = BLE_GAP_ADDR_TYPE_RANDOM_STATIC;
+
+  for(int i = 0; i < BLE_GAP_ADDR_LEN; i++)
+  {
+    nrf_rng_event_clear(NRF_RNG, NRF_RNG_EVENT_VALRDY);
+    nrf_rng_task_trigger(NRF_RNG, NRF_RNG_TASK_START);
+
+    while (!nrf_rng_event_check(NRF_RNG, NRF_RNG_EVENT_VALRDY)) delay(5);
+
+    addr.addr[i] = nrf_rng_random_value_get(NRF_RNG);
+  }
+  addr.addr[0] |= 0xC0;
 }
 
 static void showMode(bool isConfigMode) {
@@ -60,6 +78,10 @@ static void startAdv(void)
   }
   else
   {
+    ble_gap_addr_t addr;
+    GenerateRandomAddress(addr);
+    Bluefruit.setAddr(&addr);
+    
     initKeyConfigService();
   }
 
