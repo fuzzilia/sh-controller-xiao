@@ -9,6 +9,8 @@ using namespace Adafruit_LittleFS_Namespace;
 #define FILENAME "sh-config.conf"
 
 File file(InternalFS);
+static uint8_t buffer[512] = {0};
+static bool loaded = false;
 
 void printBuffer(uint8_t *data, size_t size)
 {
@@ -32,6 +34,7 @@ void ConfigLoader::save(uint8_t *data, size_t size)
         Serial.flush();
         printBuffer(data, size);
         file.close();
+        memcpy(buffer, data, size);
     }
     else
     {
@@ -42,21 +45,34 @@ void ConfigLoader::save(uint8_t *data, size_t size)
 
 std::unique_ptr<SHConfig> ConfigLoader::load()
 {
+    auto buffer = loadRaw();
+    if (buffer) {
+        return std::unique_ptr<SHConfig>(new SHConfig(buffer));
+    } else {
+        return nullptr;
+    }
+}
+
+const uint8_t *ConfigLoader::loadRaw()
+{
+    if (loaded) {
+        return buffer;
+    }
     file.open(FILENAME, FILE_O_READ);
     if (file)
     {
-        uint8_t buffer[512] = {0};
         file.read(buffer, sizeof(buffer));
         file.close();
+        loaded = true;
         // Serial.println("LoadConfig");
         // Serial.flush();
         // printBuffer(buffer, sizeof(buffer));
         // Serial.flush();
-        return std::unique_ptr<SHConfig>(new SHConfig(buffer));
+        return buffer;
     }
     else
     {
-        Serial.println("File not found.");
         return nullptr;
     }
+
 }

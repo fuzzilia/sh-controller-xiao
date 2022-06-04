@@ -191,7 +191,7 @@ private:
     bool m_needsSensorInput;
 
 public:
-    SHConfig(uint8_t *data);
+    SHConfig(const uint8_t *data);
 
     bool isValid() const {
         return m_error == Error::None;

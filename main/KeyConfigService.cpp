@@ -47,6 +47,7 @@ void initKeyConfigService()
     keyConfigCharacteristic.setPermission(SECMODE_OPEN, SECMODE_OPEN);
     keyConfigCharacteristic.begin();
     keyConfigCharacteristic.setWriteCallback(onWriteKeyConfig);
+    keyConfigCharacteristic.write((void *)ConfigLoader::loadRaw(), 512);
 
     Bluefruit.Advertising.addService(keyConfigService);
 }

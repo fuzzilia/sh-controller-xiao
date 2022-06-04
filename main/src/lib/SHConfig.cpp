@@ -150,7 +150,7 @@ uint8_t SHConfig::StickBlock::ReferenceIndex() const {
     return m_value & 0x00FF;
 }
 
-SHConfig::SHConfig(uint8_t *data) {
+SHConfig::SHConfig(const uint8_t *data) {
     DataReader reader(data);
     m_needsSensorInput = false;
 

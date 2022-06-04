@@ -13,6 +13,7 @@ class ConfigLoader {
 public:
     static void save(uint8_t *data, size_t size);
     static std::unique_ptr<SHConfig> load();
+    static const uint8_t *loadRaw();
 };
 
 #endif // SH_CONTROLLER_CONFIG_LOADER_H
