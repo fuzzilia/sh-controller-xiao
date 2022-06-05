@@ -12,13 +12,14 @@
 #include "ButtonMatrix.h"
 #include "AnalogStick.h"
 #include "nrf_rng.h"
+#include "nrf_soc.h"
 
 #define TICK_PER_SEC 60
 #define READ_MOTION_PER_TICK 3
 
 Adafruit_DotStar strip(1, PIN_DOTSTAR_DATA, PIN_DOTSTAR_CLOCK, DOTSTAR_BRG);
 
-static CL3GD20 *l2gd20 = nullptr; // ジャイロセンサー.
+// static CL3GD20 *l2gd20 = nullptr; // ジャイロセンサー.
 
 BLEDis bledis;
 
@@ -28,11 +29,12 @@ static int readMotionCount = 0;
 static SHController *sh_controller = nullptr;
 static bool isConfigMode = false;
 
-std::vector<MotionSensorValue> MotionSensorValues() {
+std::vector<MotionSensorValue> MotionSensorValues()
+{
   return {
-    MotionSensorValue{.time_span_s = 1.0f / 60 / 3, .gyro = {.x = 0.0f, .y = 0.0f, .z = 0.0f}},
-    MotionSensorValue{.time_span_s = 1.0f / 60 / 3, .gyro = {.x = 0.0f, .y = 0.0f, .z = 0.0f}},
-    MotionSensorValue{.time_span_s = 1.0f / 60 / 3, .gyro = {.x = 0.0f, .y = 0.0f, .z = 0.0f}},
+      MotionSensorValue{.time_span_s = 1.0f / 60 / 3, .gyro = {.x = 0.0f, .y = 0.0f, .z = 0.0f}},
+      MotionSensorValue{.time_span_s = 1.0f / 60 / 3, .gyro = {.x = 0.0f, .y = 0.0f, .z = 0.0f}},
+      MotionSensorValue{.time_span_s = 1.0f / 60 / 3, .gyro = {.x = 0.0f, .y = 0.0f, .z = 0.0f}},
   };
 }
 
@@ -40,31 +42,38 @@ static void GenerateRandomAddress(ble_gap_addr_t &addr)
 {
   addr.addr_id_peer = 0;
   addr.addr_type = BLE_GAP_ADDR_TYPE_RANDOM_STATIC;
-
-  for(int i = 0; i < BLE_GAP_ADDR_LEN; i++)
-  {
-    nrf_rng_event_clear(NRF_RNG, NRF_RNG_EVENT_VALRDY);
-    nrf_rng_task_trigger(NRF_RNG, NRF_RNG_TASK_START);
-
-    while (!nrf_rng_event_check(NRF_RNG, NRF_RNG_EVENT_VALRDY)) delay(5);
-
-    addr.addr[i] = nrf_rng_random_value_get(NRF_RNG);
+  for (int i = 0; i < BLE_GAP_ADDR_LEN; i++) {
+    addr.addr[i] = 0;
   }
-  addr.addr[0] |= 0xC0;
+
+  uint8_t availableBytes;
+  do {
+    Serial.println("generating...");
+    Serial.flush();
+    delay(10);
+    sd_rand_application_bytes_available_get(&availableBytes);
+  } while (availableBytes < BLE_GAP_ADDR_LEN);
+  sd_rand_application_vector_get(addr.addr, BLE_GAP_ADDR_LEN);
+  Serial.println("generated.");
+  for (int i = 0; i < BLE_GAP_ADDR_LEN; i++) {
+    Serial.print(i);
+    Serial.print(" : ");
+    Serial.println(addr.addr[i]);
+  }
+  Serial.flush();
 }
 
-static void showMode(bool isConfigMode) {
-  strip.begin();
-  strip.setBrightness(2);
+static void showMode(bool isConfigMode)
+{
   if (isConfigMode)
   {
     Serial.println("config mode");
-    strip.setPixelColor(0, 0, 0, 255);
+    strip.setPixelColor(0, 0, 0, 20);
   }
   else
   {
     Serial.println("key mode");
-    strip.setPixelColor(0, 0, 255, 0);
+    strip.setPixelColor(0, 0, 20, 0);
   }
   strip.show();
   Serial.flush();
@@ -81,7 +90,7 @@ static void startAdv(void)
     ble_gap_addr_t addr;
     GenerateRandomAddress(addr);
     Bluefruit.setAddr(&addr);
-    
+
     initKeyConfigService();
   }
 
@@ -106,35 +115,48 @@ static void startAdv(void)
   Bluefruit.Advertising.start(0);             // 0 = Don't stop advertising after n seconds
 }
 
-void Tick(TimerHandle_t xTimer){
+void Tick(TimerHandle_t xTimer)
+{
   // ジャイロセンサーの読み取り処理 + コントローラーの定期処理
   readMotionCount++;
-  if (readMotionCount >= READ_MOTION_PER_TICK) {
+  Serial.println("tick");
+  Serial.flush();
+  if (readMotionCount >= READ_MOTION_PER_TICK)
+  {
     RefreshStickValue();
     sh_controller->tick();
     readMotionCount = 0;
   }
 }
 
-void setup() {
+void setup()
+{
   strip.begin();
   strip.setBrightness(2);
-  strip.setPixelColor(0, 255, 0, 0);
   strip.show();
-  
-	Serial.begin(115200);
-  while ( !Serial ) delay(10);   // for nrf52840 with native usb
+  Serial.begin(115200);
+  while (!Serial)
+    delay(10); // for nrf52840 with native usb
 
   analogReadResolution(12);
   InitPinsForButton();
   InitPinsForStick();
 
   InternalFS.begin();
+  strip.setPixelColor(0, 255, 255, 0);
+  strip.show();
   isConfigMode = ConfigButtonIsOn();
 
   showMode(isConfigMode);
 
+  Serial.println("start load");
+  Serial.flush();
   auto config = ConfigLoader::load();
+  {
+    auto configString = config->ToString();
+    Serial.println(configString.c_str());
+    Serial.flush();
+  }
   sh_controller = new SHController(std::move(config), ButtonIsOn, StickValue, MotionSensorValues);
 
   Bluefruit.begin();
@@ -147,14 +169,21 @@ void setup() {
   bledis.begin();
 
   startAdv();
-  if (sh_controller->config().NeedsSensorInput()) {
-    l2gd20 = new CL3GD20();
+  if (sh_controller->config().NeedsSensorInput())
+  {
+    // l2gd20 = new CL3GD20();
   }
 
-  tickTimer = xTimerCreate("Tick", ms2tick(1000) / TICK_PER_SEC / READ_MOTION_PER_TICK, pdTRUE , 0, Tick);
+  tickTimer = xTimerCreate("Tick", ms2tick(1000) / TICK_PER_SEC / READ_MOTION_PER_TICK, pdTRUE, 0, Tick);
+
+  Serial.println("start");
+  Serial.flush();
 }
 
-void loop() {
+uint8_t val = 0;
+
+void loop()
+{
   // こっちのloopではなにもしない。
   delay(10000);
 }

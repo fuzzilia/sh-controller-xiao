@@ -8,9 +8,15 @@ using namespace Adafruit_LittleFS_Namespace;
 
 #define FILENAME "sh-config.conf"
 
-File file(InternalFS);
+static File file(InternalFS);
 static uint8_t buffer[512] = {0};
 static bool loaded = false;
+
+static std::vector<KeypadId> _validKeypadIds = {KeypadId::ShControllerNrf52};
+
+const std::vector<KeypadId> &ConfigLoader::validKeypadIds() {
+    return _validKeypadIds;
+}
 
 void printBuffer(uint8_t *data, size_t size)
 {
@@ -46,33 +52,47 @@ void ConfigLoader::save(uint8_t *data, size_t size)
 std::unique_ptr<SHConfig> ConfigLoader::load()
 {
     auto buffer = loadRaw();
-    if (buffer) {
-        return std::unique_ptr<SHConfig>(new SHConfig(buffer));
-    } else {
-        return nullptr;
+    if (buffer)
+    {
+        Serial.println("config loaded");
+        Serial.flush();
+        return std::unique_ptr<SHConfig>(new SHConfig(buffer, validKeypadIds()));
+    }
+    else
+    {
+        Serial.println("config dosen't exist. use default config.");
+        Serial.flush();
+        return SHConfig::defaultConfig(KeypadId::ShControllerNrf52);
     }
 }
 
 const uint8_t *ConfigLoader::loadRaw()
 {
-    if (loaded) {
+    if (loaded)
+    {
         return buffer;
     }
     file.open(FILENAME, FILE_O_READ);
     if (file)
     {
-        file.read(buffer, sizeof(buffer));
+        auto result = file.read(buffer, sizeof(buffer));
         file.close();
-        loaded = true;
-        // Serial.println("LoadConfig");
-        // Serial.flush();
-        // printBuffer(buffer, sizeof(buffer));
-        // Serial.flush();
-        return buffer;
+        if (result)
+        {
+            loaded = true;
+            // Serial.println("LoadConfig");
+            // Serial.flush();
+            // printBuffer(buffer, sizeof(buffer));
+            // Serial.flush();
+            return buffer;
+        }
+        else
+        {
+            return nullptr;
+        }
     }
     else
     {
         return nullptr;
     }
-
 }

@@ -23,6 +23,7 @@ enum class StickBlockType : uint8_t {
 };
 
 enum class KeypadId : uint16_t {
+    ShControllerNrf52 = 0x0001,
     JoyConL = 0x0081,
     JoyConR = 0x0082,
 };
@@ -155,6 +156,8 @@ public:
     };
 
 private:
+    SHConfig(KeypadId keyapdId);
+
     SHConfig(const SHConfig &) = delete;
 
     SHConfig &operator=(const SHConfig &) = delete;
@@ -191,7 +194,9 @@ private:
     bool m_needsSensorInput;
 
 public:
-    SHConfig(const uint8_t *data);
+    SHConfig(const uint8_t *data, const std::vector<KeypadId> &keypadIds);
+
+    static std::unique_ptr<SHConfig> defaultConfig(KeypadId keypadId);
 
     bool isValid() const {
         return m_error == Error::None;

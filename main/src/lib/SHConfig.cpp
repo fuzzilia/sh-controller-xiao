@@ -1,5 +1,6 @@
 #include "SHConfig.h"
 
+#include <algorithm>
 #include <sstream>
 #include <bitset>
 
@@ -30,6 +31,8 @@ static uint8_t ButtonCountForKeypad(KeypadId id) {
         case KeypadId::JoyConL:
         case KeypadId::JoyConR:
             return 11;
+        case KeypadId::ShControllerNrf52:
+            return 10;
         default:
             return 0;
     }
@@ -39,6 +42,8 @@ static uint8_t StickCountForKeypad(KeypadId id) {
     switch (id) {
         case KeypadId::JoyConL:
         case KeypadId::JoyConR:
+            return 1;
+        case KeypadId::ShControllerNrf52:
             return 1;
         default:
             return 0;
@@ -150,7 +155,7 @@ uint8_t SHConfig::StickBlock::ReferenceIndex() const {
     return m_value & 0x00FF;
 }
 
-SHConfig::SHConfig(const uint8_t *data) {
+SHConfig::SHConfig(const uint8_t *data, const std::vector<KeypadId> &keypadIds) {
     DataReader reader(data);
     m_needsSensorInput = false;
 
@@ -160,12 +165,15 @@ SHConfig::SHConfig(const uint8_t *data) {
         return;
     }
 
-    auto raw_keypad_id = reader.ReadUint16();
-    m_keypad_id = (KeypadId) raw_keypad_id;
-    if (m_keypad_id != KeypadId::JoyConL && m_keypad_id != KeypadId::JoyConR) {
+    auto rawKeypadId = reader.ReadUint16();
+    auto keypadIdIsValid = !std::any_of(keypadIds.begin(), keypadIds.end(), [&rawKeypadId](KeypadId keypadId) {
+        return (uint16_t)keypadId == rawKeypadId;
+    });
+    if (!keypadIdIsValid) {
         m_error = Error::UnknownKeypadId;
         return;
     }
+    m_keypad_id = (KeypadId) rawKeypadId;
     uint8_t button_count = ButtonCountForKeypad(m_keypad_id);
     m_stick_count = StickCountForKeypad(m_keypad_id);
 
@@ -323,168 +331,185 @@ SHConfig::SHConfig(const uint8_t *data) {
     m_error = Error::None;
 }
 
+SHConfig::SHConfig(KeypadId keyapdId): m_error(Error::None), m_keypad_id(keyapdId), m_stick_count(1), m_needsSensorInput(false) {
+    m_standard_button_numbers.push_back(0);
+    m_standard_button_numbers.push_back(1);
+    m_standard_button_numbers.push_back(2);
+
+    ConfigsForCombination configs;
+    configs.buttons = new ButtonBlock[3];
+    configs.buttons[0] = ButtonBlock::StandardButtonBlock(0x00, 0x04); // a
+    configs.buttons[1] = ButtonBlock::StandardButtonBlock(0x00, 0x05); // b
+    configs.buttons[2] = ButtonBlock::StandardButtonBlock(0x00, 0x06); // c
+    m_configs_by_combination.push_back(std::move(configs));
+}
+
 std::string SHConfig::ToString() const {
     std::ostringstream stream;
 
     stream << "Combination Buttons:";
     if (m_combination_button_numbers.empty()) {
-        stream << " None\n\n";
+        stream << " None\r\n\r\n";
     } else {
-        stream << "\n";
+        stream << "\r\n";
         for (const auto number : m_combination_button_numbers) {
-            stream << "  " << number << "\n";
+            stream << "  " << number << "\r\n";
         }
-        stream << "\n";
+        stream << "\r\n";
     }
 
     for (unsigned combination_index = 0; combination_index < m_configs_by_combination.size(); combination_index++) {
         auto &for_combination = m_configs_by_combination[combination_index];
-        stream << "Combination " << std::bitset<3>{combination_index} << ":\n";
+        stream << "Combination " << std::bitset<3>{combination_index} << ":\r\n";
 
         stream << "  Buttons:";
         if (for_combination.buttons) {
-            stream << "\n";
+            stream << "\r\n";
             for (unsigned i = 0; i < m_standard_button_numbers.size(); i++) {
                 stream << "    " << (int) m_standard_button_numbers[i] << " : ";
                 auto &button = for_combination.buttons[i];
                 switch (button.BlockType()) {
                     case ButtonBlockType::Empty:
-                        stream << "Empty\n";
+                        stream << "Empty\r\n";
                         break;
                     case ButtonBlockType::Standard:
                         stream << "Standard ";
                         button.GetKeyboardValue().WriteLabelToStream(stream);
-                        stream << "\n";
+                        stream << "\r\n";
                         break;
                     case ButtonBlockType::Gesture: {
                         auto gesture = GestureButtonConfigAt(button.ReferenceIndex());
                         stream << "Gesture ";
-                        stream << "\n";
+                        stream << "\r\n";
                         stream << "      x+ : ";
                         gesture.rotate.x.positive.WriteLabelToStream(stream);
-                        stream << "\n";
+                        stream << "\r\n";
                         stream << "      x- : ";
                         gesture.rotate.x.negative.WriteLabelToStream(stream);
-                        stream << "\n";
+                        stream << "\r\n";
                         stream << "      y+ : ";
                         gesture.rotate.y.positive.WriteLabelToStream(stream);
-                        stream << "\n";
+                        stream << "\r\n";
                         stream << "      y- : ";
                         gesture.rotate.y.negative.WriteLabelToStream(stream);
-                        stream << "\n";
+                        stream << "\r\n";
                         stream << "      z+ : ";
                         gesture.rotate.z.positive.WriteLabelToStream(stream);
-                        stream << "\n";
+                        stream << "\r\n";
                         stream << "      z- : ";
                         gesture.rotate.z.negative.WriteLabelToStream(stream);
-                        stream << "\n";
+                        stream << "\r\n";
                         break;
                     }
                     case ButtonBlockType::Rotation: {
                         auto rotation = RotateButtonConfigAt(button.ReferenceIndex());
-                        stream << "Rotation [lock:" << (rotation.locks_axis ? "enable" : "disable") << "\n";
-                        stream << "      x : split-" << (int) rotation.rotate_split_size.x << "\n";
+                        stream << "Rotation [lock:" << (rotation.locks_axis ? "enable" : "disable") << "\r\n";
+                        stream << "      x : split-" << (int) rotation.rotate_split_size.x << "\r\n";
                         stream << "      x+ : ";
                         rotation.rotate.x.positive.WriteLabelToStream(stream);
-                        stream << "\n";
+                        stream << "\r\n";
                         stream << "      x- : ";
                         rotation.rotate.x.negative.WriteLabelToStream(stream);
-                        stream << "\n";
-                        stream << "      y : split-" << (int) rotation.rotate_split_size.y << "\n";
+                        stream << "\r\n";
+                        stream << "      y : split-" << (int) rotation.rotate_split_size.y << "\r\n";
                         stream << "      y+ : ";
                         rotation.rotate.y.positive.WriteLabelToStream(stream);
-                        stream << "\n";
+                        stream << "\r\n";
                         stream << "      y- : ";
                         rotation.rotate.y.negative.WriteLabelToStream(stream);
-                        stream << "\n";
-                        stream << "      z : split-" << (int) rotation.rotate_split_size.z << "\n";
+                        stream << "\r\n";
+                        stream << "      z : split-" << (int) rotation.rotate_split_size.z << "\r\n";
                         stream << "      z+ : ";
                         rotation.rotate.z.positive.WriteLabelToStream(stream);
-                        stream << "\n";
+                        stream << "\r\n";
                         stream << "      z- : ";
                         rotation.rotate.z.negative.WriteLabelToStream(stream);
-                        stream << "\n";
+                        stream << "\r\n";
                         break;
                     }
                 }
             }
         } else {
-            stream << " Empty\n";
+            stream << " Empty\r\n";
         }
 
         stream << "  Sticks:";
         if (for_combination.sticks) {
-            stream << "\n";
+            stream << "\r\n";
             for (int i = 0; i < m_stick_count; i++) {
                 stream << "    " << i << " : ";
                 auto &stick = for_combination.sticks[i];
                 switch (stick.BlockType()) {
                     case StickBlockType::Empty:
-                        stream << "Empty\n";
+                        stream << "Empty\r\n";
                         break;
                     case StickBlockType::FourButton: {
-                        stream << "4Button\n";
+                        stream << "4Button\r\n";
                         auto button = FourButtonStickConfigAt(stick.ReferenceIndex());
                         stream << "      Up    : ";
                         button.keys[0].WriteLabelToStream(stream);
-                        stream << "\n";
+                        stream << "\r\n";
                         stream << "      Right : ";
                         button.keys[1].WriteLabelToStream(stream);
-                        stream << "\n";
+                        stream << "\r\n";
                         stream << "      Down  : ";
                         button.keys[2].WriteLabelToStream(stream);
-                        stream << "\n";
+                        stream << "\r\n";
                         stream << "      Left  : ";
                         button.keys[3].WriteLabelToStream(stream);
-                        stream << "\n";
+                        stream << "\r\n";
                         break;
                     }
                     case StickBlockType::EightButton: {
-                        stream << "8Button\n";
+                        stream << "8Button\r\n";
                         auto button = EightButtonStickConfigAt(stick.ReferenceIndex());
                         stream << "      Up         : ";
                         button.keys[0].WriteLabelToStream(stream);
-                        stream << "\n";
+                        stream << "\r\n";
                         stream << "      Up-Right   : ";
                         button.keys[1].WriteLabelToStream(stream);
-                        stream << "\n";
+                        stream << "\r\n";
                         stream << "      Right      : ";
                         button.keys[2].WriteLabelToStream(stream);
-                        stream << "\n";
+                        stream << "\r\n";
                         stream << "      Down-Right : ";
                         button.keys[3].WriteLabelToStream(stream);
-                        stream << "\n";
+                        stream << "\r\n";
                         stream << "      Down       : ";
                         button.keys[4].WriteLabelToStream(stream);
-                        stream << "\n";
+                        stream << "\r\n";
                         stream << "      Down-Left  : ";
                         button.keys[5].WriteLabelToStream(stream);
-                        stream << "\n";
+                        stream << "\r\n";
                         stream << "      Left       : ";
                         button.keys[6].WriteLabelToStream(stream);
-                        stream << "\n";
+                        stream << "\r\n";
                         stream << "      Up-Left    : ";
                         button.keys[7].WriteLabelToStream(stream);
-                        stream << "\n";
+                        stream << "\r\n";
                         break;
                     }
                     case StickBlockType::Rotate: {
                         auto rotate = RotateStickConfigAt(stick.ReferenceIndex());
-                        stream << "Rotate [split=" << (int) rotate.split_size << "]\n";
+                        stream << "Rotate [split=" << (int) rotate.split_size << "]\r\n";
                         stream << "      + : ";
                         rotate.key.positive.WriteLabelToStream(stream);
-                        stream << "\n";
+                        stream << "\r\n";
                         stream << "      - : ";
                         rotate.key.negative.WriteLabelToStream(stream);
-                        stream << "\n";
+                        stream << "\r\n";
                         break;
                     }
                 }
             }
         } else {
-            stream << " Empty\n";
+            stream << " Empty\r\n";
         }
     }
 
     return stream.str();
+}
+
+std::unique_ptr<SHConfig> SHConfig::defaultConfig(KeypadId keypadId) {
+    return std::unique_ptr<SHConfig>(new SHConfig(keypadId));
 }

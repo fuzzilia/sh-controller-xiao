@@ -11,6 +11,7 @@
  */
 class ConfigLoader {
 public:
+    static const std::vector<KeypadId> &validKeypadIds();
     static void save(uint8_t *data, size_t size);
     static std::unique_ptr<SHConfig> load();
     static const uint8_t *loadRaw();

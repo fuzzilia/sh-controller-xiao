@@ -24,7 +24,7 @@ static void onWriteKeyConfig(uint16_t handle, BLECharacteristic *characteristic,
         Serial.println("");
 
         {
-            SHConfig config(data);
+            SHConfig config(data, ConfigLoader::validKeypadIds());
             if (!config.isValid()) {
                 // 本当はBLEレベルでの書き込み失敗扱いにしたいが、ライブラリの作りの問題で不可能っぽい
                 return;
