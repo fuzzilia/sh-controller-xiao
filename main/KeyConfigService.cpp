@@ -4,6 +4,7 @@
 #include <bluefruit.h>
 #include "KeyConfigService.h"
 #include "ConfigLoader.h"
+#include "Common.h"
 
 const uint8_t keyConfigServiceUuid[] =
     {0x5F, 0x52, 0xF7, 0x79, 0x8B, 0x72, 0xDD, 0xA8, 0x23, 0x45, 0x54, 0x6B, 0x1C, 0xDC, 0xFD, 0x20};
@@ -18,19 +19,23 @@ static void onWriteKeyConfig(uint16_t handle, BLECharacteristic *characteristic,
 {
     if (characteristic == &keyConfigCharacteristic)
     {
+#ifndef SH_CONTROLLER_PRODUCTION
         Serial.println("onWrite");
         Serial.print("Size : ");
         Serial.print(size);
         Serial.println("");
         Serial.flush();
-
+#endif
         {
             SHConfig config(data, ConfigLoader::validKeypadIds());
+            
             if (!config.isValid())
             {
+#ifndef SH_CONTROLLER_PRODUCTION
                 Serial.println("config is invalid.");
                 Serial.println((int)config.error());
                 Serial.flush();
+#endif
 
                 // 本当はBLEレベルでの書き込み失敗扱いにしたいが、ライブラリの作りの問題で不可能っぽい
                 return;
@@ -41,7 +46,7 @@ static void onWriteKeyConfig(uint16_t handle, BLECharacteristic *characteristic,
     }
     else
     {
-        Serial.println("uuid is not match @ onWrite");
+        DEBUG_PRINT("uuid is not match @ onWrite");
     }
 }
 

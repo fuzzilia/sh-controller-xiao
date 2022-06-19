@@ -13,6 +13,7 @@
 #include "AnalogStick.h"
 #include "nrf_rng.h"
 #include "nrf_soc.h"
+#include "Common.h"
 
 #define FRAME_PER_SEC 60
 #define READ_MOTION_PER_FRAME 3
@@ -49,13 +50,14 @@ static void GenerateRandomAddress(ble_gap_addr_t &addr)
 
   uint8_t availableBytes;
   do {
-    Serial.println("generating...");
-    Serial.flush();
+    DEBUG_PRINT("generating...");
     delay(10);
     sd_rand_application_bytes_available_get(&availableBytes);
   } while (availableBytes < BLE_GAP_ADDR_LEN);
   sd_rand_application_vector_get(addr.addr, BLE_GAP_ADDR_LEN);
   addr.addr[5] |= 0xC0;
+
+#ifndef SH_CONTROLLER_PRODUCTION
   Serial.println("generated.");
   for (int i = 0; i < BLE_GAP_ADDR_LEN; i++) {
     Serial.print(":");
@@ -63,22 +65,22 @@ static void GenerateRandomAddress(ble_gap_addr_t &addr)
   }
   Serial.println("");
   Serial.flush();
+#endif
 }
 
 static void showMode(bool isConfigMode)
 {
   if (isConfigMode)
   {
-    Serial.println("config mode");
+    DEBUG_PRINT("config mode");
     strip.setPixelColor(0, 0, 0, 20);
   }
   else
   {
-    Serial.println("key mode");
+    DEBUG_PRINT("key mode");
     strip.setPixelColor(0, 0, 20, 0);
   }
   strip.show();
-  Serial.flush();
 }
 
 static void startAdv(void)
@@ -120,17 +122,14 @@ static void startAdv(void)
   Bluefruit.Advertising.setFastTimeout(30);   // number of seconds in fast mode
   bool isOk = Bluefruit.Advertising.start(0);
   if (isOk) {
-    Serial.println("start adv.");
-    Serial.flush();
+    DEBUG_PRINT("start adv.");
   } else {
-    Serial.println("adv failed.");
-    Serial.flush();
+    DEBUG_PRINT("adv failed.");
   }
 }
 
 static void OnConnect(uint16_t connection_handle) {
-  Serial.println("on connect");
-  Serial.flush();
+  DEBUG_PRINT("on connect");
 }
 
 void setup()
@@ -153,21 +152,24 @@ void setup()
 
   showMode(isConfigMode);
 
-  Serial.println("start load");
-  Serial.flush();
+  DEBUG_PRINT("start load");
   auto config = ConfigLoader::load();
+#ifndef SH_CONTROLLER_PRODUCTION
   {
     auto configString = config->ToString();
     Serial.println(configString.c_str());
     Serial.flush();
   }
+#endif
   sh_controller = new SHController(std::move(config), ButtonIsOn, StickValue, MotionSensorValues);
 
   Bluefruit.begin();
   Bluefruit.setTxPower(4); // Check bluefruit.h for supported values
   Bluefruit.setName("SH-CON2");
-  
+
+#ifndef SH_CONTROLLER_PRODUCTION
   Bluefruit.Periph.setConnectCallback(OnConnect);
+#endif
 
   // // Configure and Start Device Information Service
   bledis.setManufacturer("FUZZILIA");
@@ -180,16 +182,14 @@ void setup()
     // l2gd20 = new CL3GD20();
   }
 
-  Serial.println("start");
-  Serial.flush();
+  DEBUG_PRINT("start");
   startTick = xTaskGetTickCount();
 }
 
 void loop()
 {
   if (isConfigMode) {
-    Serial.println("config...");
-    Serial.flush();
+    DEBUG_PRINT("config...");
     vTaskDelay(10000);
   } else {
     vTaskDelay(configTICK_RATE_HZ / 64 / 2);

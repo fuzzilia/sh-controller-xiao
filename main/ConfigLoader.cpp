@@ -3,6 +3,7 @@
 #include <Adafruit_LittleFS.h>
 #include <InternalFileSystem.h>
 #include "ConfigLoader.h"
+#include "Common.h"
 
 using namespace Adafruit_LittleFS_Namespace;
 
@@ -36,16 +37,17 @@ void ConfigLoader::save(uint8_t *data, size_t size)
     if (file.open(FILENAME, FILE_O_WRITE))
     {
         file.write(data, size);
+#ifndef SH_CONTROLLER_PRODUCTION
         Serial.println("SaveConfig");
         Serial.flush();
         printBuffer(data, size);
+#endif
         file.close();
         memcpy(buffer, data, size);
     }
     else
     {
-        Serial.println("SaveFailed");
-        Serial.flush();
+        DEBUG_PRINT("SaveFailed");
     }
 }
 
@@ -54,14 +56,12 @@ std::unique_ptr<SHConfig> ConfigLoader::load()
     auto buffer = loadRaw();
     if (buffer)
     {
-        Serial.println("config loaded");
-        Serial.flush();
+        DEBUG_PRINT("config loaded");
         return std::unique_ptr<SHConfig>(new SHConfig(buffer, validKeypadIds()));
     }
     else
     {
-        Serial.println("config dosen't exist. use default config.");
-        Serial.flush();
+        DEBUG_PRINT("config dosen't exist. use default config.");
         return SHConfig::defaultConfig(KeypadId::ShControllerNrf52);
     }
 }

@@ -44,7 +44,9 @@ void printSendKey(const KeyboardValue &key)
 
 void sendKey(KeyboardValue key)
 {
+#ifndef SH_CONTROLLER_PRODUCTION
     printSendKey(key);
+#endif
     setKeyToReport(key);
     blehid.keyboardReport(BLE_CONN_HANDLE_INVALID, &report);
 }
