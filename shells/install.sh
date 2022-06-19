@@ -6,4 +6,4 @@ arduino-cli core install adafruit:nrf52
 arduino-cli lib install "Adafruit DotStar"
 arduino-cli lib install "Adafruit BusIO"
 arduino-cli lib install "Adafruit MPR121"
-pip3 install adafruit-nrfutil --user
+pip3 install --user adafruit-nrfutil

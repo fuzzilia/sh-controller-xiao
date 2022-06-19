@@ -9,3 +9,4 @@ arduino-cli compile -b $FQBN \
   --build-property "compiler.cpp.flags=$CPP_FLAGS" \
   --build-property compiler.c.elf.cmd=arm-none-eabi-g++ \
   --build-path out
+uf2conv.py -c out/main.ino.hex --out out/sh-controller-nrf52.uf2 --family 0xADA52840
