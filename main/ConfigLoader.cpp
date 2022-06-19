@@ -30,12 +30,14 @@ void printBuffer(uint8_t *data, size_t size)
         Serial.print(" ");
     }
     Serial.println("]");
+    Serial.flush();
 }
 
 void ConfigLoader::save(uint8_t *data, size_t size)
 {
     if (file.open(FILENAME, FILE_O_WRITE))
     {
+        file.seek(0);
         file.write(data, size);
 #ifndef SH_CONTROLLER_PRODUCTION
         Serial.println("SaveConfig");
@@ -81,9 +83,7 @@ const uint8_t *ConfigLoader::loadRaw()
         {
             loaded = true;
             // Serial.println("LoadConfig");
-            // Serial.flush();
             // printBuffer(buffer, sizeof(buffer));
-            // Serial.flush();
             return buffer;
         }
         else
