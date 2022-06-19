@@ -14,8 +14,9 @@
 #include "nrf_rng.h"
 #include "nrf_soc.h"
 
-#define TICK_PER_SEC 60
-#define READ_MOTION_PER_TICK 3
+#define FRAME_PER_SEC 60
+#define READ_MOTION_PER_FRAME 3
+static float READ_MOTION_PERIOD_MS = 1.0f / FRAME_PER_SEC / READ_MOTION_PER_FRAME;
 
 Adafruit_DotStar strip(1, PIN_DOTSTAR_DATA, PIN_DOTSTAR_CLOCK, DOTSTAR_BRG);
 
@@ -23,11 +24,11 @@ Adafruit_DotStar strip(1, PIN_DOTSTAR_DATA, PIN_DOTSTAR_CLOCK, DOTSTAR_BRG);
 
 BLEDis bledis;
 
-TimerHandle_t tickTimer;
 static int readMotionCount = 0;
 
 static SHController *sh_controller = nullptr;
 static bool isConfigMode = false;
+static portTickType startTick;
 
 std::vector<MotionSensorValue> MotionSensorValues()
 {
@@ -54,12 +55,13 @@ static void GenerateRandomAddress(ble_gap_addr_t &addr)
     sd_rand_application_bytes_available_get(&availableBytes);
   } while (availableBytes < BLE_GAP_ADDR_LEN);
   sd_rand_application_vector_get(addr.addr, BLE_GAP_ADDR_LEN);
+  addr.addr[5] |= 0xC0;
   Serial.println("generated.");
   for (int i = 0; i < BLE_GAP_ADDR_LEN; i++) {
-    Serial.print(i);
-    Serial.print(" : ");
-    Serial.println(addr.addr[i]);
+    Serial.print(":");
+    Serial.println(addr.addr[i], HEX);
   }
+  Serial.println("");
   Serial.flush();
 }
 
@@ -84,6 +86,11 @@ static void startAdv(void)
   if (!isConfigMode)
   {
     initKeyService();
+
+    Bluefruit.Advertising.addFlags(BLE_GAP_ADV_FLAGS_LE_ONLY_GENERAL_DISC_MODE);
+    Bluefruit.Advertising.addTxPower();
+    Bluefruit.Advertising.addAppearance(BLE_APPEARANCE_HID_KEYBOARD);
+    Bluefruit.Advertising.addName();
   }
   else
   {
@@ -91,14 +98,13 @@ static void startAdv(void)
     GenerateRandomAddress(addr);
     Bluefruit.setAddr(&addr);
 
-    initKeyConfigService();
-  }
+    Bluefruit.setName("SH-CONF");
 
-  // Advertising packet
-  Bluefruit.Advertising.addFlags(BLE_GAP_ADV_FLAGS_LE_ONLY_GENERAL_DISC_MODE);
-  Bluefruit.Advertising.addTxPower();
-  Bluefruit.Advertising.addAppearance(BLE_APPEARANCE_HID_KEYBOARD);
-  Bluefruit.Advertising.addName();
+    initKeyConfigService();
+
+    Bluefruit.Advertising.addFlags(BLE_GAP_ADV_FLAGS_LE_ONLY_GENERAL_DISC_MODE);
+    Bluefruit.Advertising.addName();
+  }
 
   /* Start Advertising
    * - Enable auto advertising if disconnected
@@ -112,21 +118,19 @@ static void startAdv(void)
   Bluefruit.Advertising.restartOnDisconnect(true);
   Bluefruit.Advertising.setInterval(32, 244); // in unit of 0.625 ms
   Bluefruit.Advertising.setFastTimeout(30);   // number of seconds in fast mode
-  Bluefruit.Advertising.start(0);             // 0 = Don't stop advertising after n seconds
+  bool isOk = Bluefruit.Advertising.start(0);
+  if (isOk) {
+    Serial.println("start adv.");
+    Serial.flush();
+  } else {
+    Serial.println("adv failed.");
+    Serial.flush();
+  }
 }
 
-void Tick(TimerHandle_t xTimer)
-{
-  // ジャイロセンサーの読み取り処理 + コントローラーの定期処理
-  readMotionCount++;
-  Serial.println("tick");
+static void OnConnect(uint16_t connection_handle) {
+  Serial.println("on connect");
   Serial.flush();
-  if (readMotionCount >= READ_MOTION_PER_TICK)
-  {
-    RefreshStickValue();
-    sh_controller->tick();
-    readMotionCount = 0;
-  }
 }
 
 void setup()
@@ -162,10 +166,12 @@ void setup()
   Bluefruit.begin();
   Bluefruit.setTxPower(4); // Check bluefruit.h for supported values
   Bluefruit.setName("SH-CON2");
+  
+  Bluefruit.Periph.setConnectCallback(OnConnect);
 
   // // Configure and Start Device Information Service
   bledis.setManufacturer("FUZZILIA");
-  bledis.setModel("SH-CONTROLLER2");
+  bledis.setModel("SH-CONTROLLER-NRF52");
   bledis.begin();
 
   startAdv();
@@ -174,16 +180,29 @@ void setup()
     // l2gd20 = new CL3GD20();
   }
 
-  tickTimer = xTimerCreate("Tick", ms2tick(1000) / TICK_PER_SEC / READ_MOTION_PER_TICK, pdTRUE, 0, Tick);
-
   Serial.println("start");
   Serial.flush();
+  startTick = xTaskGetTickCount();
 }
-
-uint8_t val = 0;
 
 void loop()
 {
-  // こっちのloopではなにもしない。
-  delay(10000);
+  if (isConfigMode) {
+    Serial.println("config...");
+    Serial.flush();
+    vTaskDelay(10000);
+  } else {
+    vTaskDelay(configTICK_RATE_HZ / 64 / 2);
+    
+    readMotionCount++;
+    if (readMotionCount >= 2)
+    {
+      RefreshStickValue();
+      auto keys = sh_controller->tick();
+      for (auto key : keys) {
+        sendKey(key);
+      }
+      readMotionCount = 0;
+    }
+  }
 }

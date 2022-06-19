@@ -1,5 +1,5 @@
 
-   
+
 #include <Arduino.h>
 #include <bluefruit.h>
 #include "KeyConfigService.h"
@@ -22,10 +22,16 @@ static void onWriteKeyConfig(uint16_t handle, BLECharacteristic *characteristic,
         Serial.print("Size : ");
         Serial.print(size);
         Serial.println("");
+        Serial.flush();
 
         {
             SHConfig config(data, ConfigLoader::validKeypadIds());
-            if (!config.isValid()) {
+            if (!config.isValid())
+            {
+                Serial.println("config is invalid.");
+                Serial.println((int)config.error());
+                Serial.flush();
+
                 // 本当はBLEレベルでの書き込み失敗扱いにしたいが、ライブラリの作りの問題で不可能っぽい
                 return;
             }
@@ -45,8 +51,8 @@ void initKeyConfigService()
 
     keyConfigCharacteristic.setProperties(CHR_PROPS_WRITE | CHR_PROPS_READ);
     keyConfigCharacteristic.setPermission(SECMODE_OPEN, SECMODE_OPEN);
-    keyConfigCharacteristic.begin();
     keyConfigCharacteristic.setWriteCallback(onWriteKeyConfig);
+    keyConfigCharacteristic.begin();
     keyConfigCharacteristic.write((void *)ConfigLoader::loadRaw(), 512);
 
     Bluefruit.Advertising.addService(keyConfigService);

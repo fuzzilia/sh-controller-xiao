@@ -166,7 +166,7 @@ SHConfig::SHConfig(const uint8_t *data, const std::vector<KeypadId> &keypadIds) 
     }
 
     auto rawKeypadId = reader.ReadUint16();
-    auto keypadIdIsValid = !std::any_of(keypadIds.begin(), keypadIds.end(), [&rawKeypadId](KeypadId keypadId) {
+    auto keypadIdIsValid = std::any_of(keypadIds.begin(), keypadIds.end(), [&rawKeypadId](KeypadId keypadId) {
         return (uint16_t)keypadId == rawKeypadId;
     });
     if (!keypadIdIsValid) {
