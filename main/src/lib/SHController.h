@@ -48,6 +48,7 @@ class SHController {
     struct StickRotationState {
         ProcessRotationState rotation;
         float last_angle;
+        bool is_in_center_area;
     };
 
     union State {

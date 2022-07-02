@@ -17,6 +17,7 @@
 
 #define FRAME_PER_SEC 60
 #define READ_MOTION_PER_FRAME 3
+#define LED_PIN 13
 static float READ_MOTION_PERIOD_MS = 1.0f / FRAME_PER_SEC / READ_MOTION_PER_FRAME;
 
 Adafruit_DotStar strip(1, PIN_DOTSTAR_DATA, PIN_DOTSTAR_CLOCK, DOTSTAR_BRG);
@@ -73,12 +74,12 @@ static void showMode(bool isConfigMode)
   if (isConfigMode)
   {
     DEBUG_PRINT("config mode");
-    strip.setPixelColor(0, 0, 0, 20);
+    strip.setPixelColor(0, 0, 0, 120);
   }
   else
   {
     DEBUG_PRINT("key mode");
-    strip.setPixelColor(0, 0, 20, 0);
+    strip.setPixelColor(0, 0, 120, 0);
   }
   strip.show();
 }
@@ -87,11 +88,12 @@ static void startAdv(void)
 {
   if (!isConfigMode)
   {
-    initKeyService();
-
     Bluefruit.Advertising.addFlags(BLE_GAP_ADV_FLAGS_LE_ONLY_GENERAL_DISC_MODE);
     Bluefruit.Advertising.addTxPower();
     Bluefruit.Advertising.addAppearance(BLE_APPEARANCE_HID_KEYBOARD);
+
+    initKeyService();
+
     Bluefruit.Advertising.addName();
   }
   else
@@ -128,8 +130,13 @@ static void startAdv(void)
   }
 }
 
-static void OnConnect(uint16_t connection_handle) {
+static void OnConnect(uint16_t connectionHandle) {
   DEBUG_PRINT("on connect");
+}
+
+static void OnDisconnect(uint16_t connectionHandle, uint8_t reason) {
+  DEBUG_PRINT("on disconnect");
+  DEBUG_PRINT(reason);
 }
 
 void setup()
@@ -137,13 +144,17 @@ void setup()
   strip.begin();
   strip.setBrightness(2);
   strip.show();
+
+#ifndef SH_CONTROLLER_PRODUCTION
   Serial.begin(115200);
   while (!Serial)
     delay(10); // for nrf52840 with native usb
+#endif
 
   analogReadResolution(12);
   InitPinsForButton();
   InitPinsForStick();
+  pinMode(LED_PIN, OUTPUT);
 
   InternalFS.begin();
   strip.setPixelColor(0, 255, 255, 0);
@@ -169,6 +180,7 @@ void setup()
 
 #ifndef SH_CONTROLLER_PRODUCTION
   Bluefruit.Periph.setConnectCallback(OnConnect);
+  Bluefruit.Periph.setDisconnectCallback(OnDisconnect);
 #endif
 
   // // Configure and Start Device Information Service
@@ -186,11 +198,32 @@ void setup()
   startTick = xTaskGetTickCount();
 }
 
+static int loopCount = 0;
+
 void loop()
 {
+  loopCount++;
   if (isConfigMode) {
     DEBUG_PRINT("config...");
     vTaskDelay(10000);
+    // for (int i = 0; i < 12; i++) {
+    //   if (ButtonIsOn(i)) {
+    //     Serial.print("1");
+    //   } else {
+    //     Serial.print("0");
+    //   }
+    // }
+    // Serial.print("  X=");
+    // int stickX = analogRead(PIN_A4);
+    // Serial.print(stickX);
+    // Serial.print(" Y=");
+    // int stickY = analogRead(PIN_A3);
+    // Serial.print(stickY);
+    // Serial.println("");
+    // Serial.flush();
+    // _debugLedState = !_debugLedState;
+    // digitalWrite(LED_PIN, _debugLedState ? HIGH : LOW);
+    // vTaskDelay(250);
   } else {
     vTaskDelay(configTICK_RATE_HZ / 64 / 2);
     
@@ -203,6 +236,17 @@ void loop()
         sendKey(key);
       }
       readMotionCount = 0;
+
+#ifndef SH_CONTROLLER_PRODUCTION
+      if (loopCount % (64 * 2) == 0) {
+        Serial.print("Stick X=");
+        Serial.print(StickValue(0, TwoDimension::X), 3);
+        Serial.print(" Y=");
+        Serial.print(StickValue(0, TwoDimension::Y), 3);
+        Serial.println("");
+        Serial.flush();
+      }
+#endif
     }
   }
 }

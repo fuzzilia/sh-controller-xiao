@@ -156,7 +156,7 @@ std::vector<KeyboardValue> SHController::tick() {
                 case StickBlockType::Empty:
                     break;
                 case StickBlockType::Rotate:
-                    m_state.stick_rotation = {ProcessRotationState(), 0};
+                    m_state.stick_rotation = {ProcessRotationState(), 0, true};
                     break;
                 case StickBlockType::FourButton:
                 case StickBlockType::EightButton:
@@ -201,13 +201,18 @@ std::vector<KeyboardValue> SHController::tick() {
             case StickBlockType::Rotate: {
                 const auto &config = m_config->RotateStickConfigAt(stick.ReferenceIndex());
                 if (button_state_changed) {
-                    m_state.stick_rotation = {ProcessRotationState(), normalized_angle};
+                    m_state.stick_rotation = {ProcessRotationState(), normalized_angle, false};
                     m_last_keyboard_value = KeyboardValue();
+                } else if (m_state.stick_rotation.is_in_center_area) {
+                    m_state.stick_rotation = {ProcessRotationState(), normalized_angle, false};
+                    break;
                 }
-                float normalized_angle_diff = m_state.stick_rotation.last_angle - normalized_angle;
+                float normalized_angle_diff = normalized_angle - m_state.stick_rotation.last_angle;
                 m_state.stick_rotation.last_angle = normalized_angle;
-                if (normalized_angle_diff < -0.5 || normalized_angle_diff > 0.5) {
-                    normalized_angle_diff = -normalized_angle_diff;
+                if (normalized_angle_diff < -0.5) {
+                    normalized_angle_diff += 1;
+                } else if (normalized_angle_diff > 0.5) {
+                    normalized_angle_diff -= 1;
                 }
                 int count_diff = m_state.stick_rotation.rotation.ProcessWithRelativeRotate(
                         normalized_angle_diff * config.split_size);
