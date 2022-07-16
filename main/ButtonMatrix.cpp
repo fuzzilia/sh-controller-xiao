@@ -17,13 +17,10 @@ bool ButtonIsOn(int index)
   if (outputPinIndex != lastOutputPinIndex)
   {
     if (lastOutputPinIndex >= 0) {
-      analogWrite(MatrixOutputPins[lastOutputPinIndex], 255);
+      digitalWrite(MatrixOutputPins[lastOutputPinIndex], HIGH);
     }
-    analogWrite(MatrixOutputPins[outputPinIndex], 0);
+    digitalWrite(MatrixOutputPins[outputPinIndex], LOW);
     lastOutputPinIndex = outputPinIndex;
-    for (volatile int i = 0; i < 100; i++) {
-      // 出力ピンを変更したら読み出しまで少し時間をあける必要がある
-    }
   }
   return digitalRead(MatrixInputPins[inputPinIndex]) == LOW;
 }
@@ -37,7 +34,7 @@ void InitPinsForButton()
   for (int i = 0; i < MatrixOutputPins.size(); i++)
   {
     pinMode(MatrixOutputPins[i], OUTPUT);
-    analogWrite(MatrixOutputPins[i], 255);
+    digitalWrite(MatrixOutputPins[i], HIGH);
   }
 }
 
