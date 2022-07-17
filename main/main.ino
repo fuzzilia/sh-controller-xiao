@@ -1,5 +1,6 @@
 #include <Adafruit_MPR121.h>
 #include <Adafruit_DotStar.h>
+#include <Adafruit_L3GD20_U.h>
 #include <bluefruit.h>
 #include <InternalFileSystem.h>
 #include <array>
@@ -11,6 +12,7 @@
 #include "KeyConfigService.h"
 #include "ButtonMatrix.h"
 #include "AnalogStick.h"
+#include "LEDIndicator.h"
 #include "nrf_rng.h"
 #include "nrf_soc.h"
 #include "Common.h"
@@ -18,19 +20,22 @@
 #define FRAME_PER_SEC 60
 #define READ_MOTION_PER_FRAME 3
 #define LED_PIN 13
+#define GYRO_SENSOR_ADDRESS 0x6A
 static float READ_MOTION_PERIOD_MS = 1.0f / FRAME_PER_SEC / READ_MOTION_PER_FRAME;
 
-Adafruit_DotStar strip(1, PIN_DOTSTAR_DATA, PIN_DOTSTAR_CLOCK, DOTSTAR_BRG);
+static Adafruit_DotStar strip(1, PIN_DOTSTAR_DATA, PIN_DOTSTAR_CLOCK, DOTSTAR_BRG);
 
-// static CL3GD20 *l2gd20 = nullptr; // ジャイロセンサー.
+static Adafruit_L3GD20 gyro = Adafruit_L3GD20();
 
 BLEDis bledis;
+LEDIndicator led(LED_PIN);
 
 static int readMotionCount = 0;
 
 static SHController *sh_controller = nullptr;
 static bool isConfigMode = false;
 static portTickType startTick;
+static bool isGyroEnabled = false;
 
 std::vector<MotionSensorValue> MotionSensorValues()
 {
@@ -52,7 +57,7 @@ static void GenerateRandomAddress(ble_gap_addr_t &addr)
   uint8_t availableBytes;
   do {
     DEBUG_PRINT("generating...");
-    delay(10);
+    delay(1);
     sd_rand_application_bytes_available_get(&availableBytes);
   } while (availableBytes < BLE_GAP_ADDR_LEN);
   sd_rand_application_vector_get(addr.addr, BLE_GAP_ADDR_LEN);
@@ -132,11 +137,16 @@ static void startAdv(void)
 
 static void OnConnect(uint16_t connectionHandle) {
   DEBUG_PRINT("on connect");
+  led.disableEndressBlinkBrightPattern(LEDIndicator::EndressBlinkPattern::Short);
+  led.enableEndressBlinkBrightPattern(LEDIndicator::EndressBlinkPattern::Full);
+  led.addSingleBlink(3);
 }
 
 static void OnDisconnect(uint16_t connectionHandle, uint8_t reason) {
   DEBUG_PRINT("on disconnect");
   DEBUG_PRINT(reason);
+  led.enableEndressBlinkBrightPattern(LEDIndicator::EndressBlinkPattern::Short);
+  led.disableEndressBlinkBrightPattern(LEDIndicator::EndressBlinkPattern::Full);
 }
 
 void setup()
@@ -162,6 +172,14 @@ void setup()
   isConfigMode = ConfigButtonIsOn();
 
   showMode(isConfigMode);
+  if (isConfigMode) {
+    led.beginEndressBlink(configTICK_RATE_HZ * 3);
+    led.enableEndressBlinkBrightPattern(LEDIndicator::EndressBlinkPattern::Wave);
+  } else {
+    led.beginEndressBlink(configTICK_RATE_HZ * 1.5);
+    led.initSingleBlink(configTICK_RATE_HZ * 0.8);
+    led.enableEndressBlinkBrightPattern(LEDIndicator::EndressBlinkPattern::Short);
+  }
 
   DEBUG_PRINT("start load");
   auto config = ConfigLoader::load();
@@ -178,10 +196,8 @@ void setup()
   Bluefruit.setTxPower(4); // Check bluefruit.h for supported values
   Bluefruit.setName("SH-CON2");
 
-#ifndef SH_CONTROLLER_PRODUCTION
   Bluefruit.Periph.setConnectCallback(OnConnect);
   Bluefruit.Periph.setDisconnectCallback(OnDisconnect);
-#endif
 
   // // Configure and Start Device Information Service
   bledis.setManufacturer("FUZZILIA");
@@ -189,10 +205,21 @@ void setup()
   bledis.begin();
 
   startAdv();
-  if (sh_controller->config().NeedsSensorInput())
-  {
-    // l2gd20 = new CL3GD20();
-  }
+  // if (!isConfigMode)
+  // // if (!isConfigMode && sh_controller->config().NeedsSensorInput())
+  // {
+  //   DEBUG_PRINT("initialize gyro.");
+
+  //   // アドレス設定がAdafruit_L3GD20_Unifiedの前提と異なっているので、Adafruit_L3GD20_Unifiedは使わずAdafruit_L3GD20を使う方針
+  //   // だが、Adafruit_L3GD20内で利用している_i2cをAdafruit_L3GD20経由で初期化する方法が無いので、
+  //   // Adafruit_L3GD20_Unifiedのbeginメソッドを利用して初期化する。
+  //   Adafruit_L3GD20_Unified gyroForInit;
+  //   gyroForInit.begin();
+  //   auto isGyroEnabled = gyro.begin(GYRO_RANGE_250DPS, GYRO_SENSOR_ADDRESS);
+  //   if (!isGyroEnabled) {
+  //     DEBUG_PRINT("fail to initialize gyro.");
+  //   }
+  // }
 
   DEBUG_PRINT("start");
   startTick = xTaskGetTickCount();
@@ -203,29 +230,12 @@ static int loopCount = 0;
 void loop()
 {
   loopCount++;
+  auto localStartTickCount = xTaskGetTickCount();
+  led.tick(localStartTickCount);
   if (isConfigMode) {
     DEBUG_PRINT("config...");
-    vTaskDelay(10000);
-    // for (int i = 0; i < 12; i++) {
-    //   if (ButtonIsOn(i)) {
-    //     Serial.print("1");
-    //   } else {
-    //     Serial.print("0");
-    //   }
-    // }
-    // Serial.print("  X=");
-    // int stickX = analogRead(PIN_A4);
-    // Serial.print(stickX);
-    // Serial.print(" Y=");
-    // int stickY = analogRead(PIN_A3);
-    // Serial.print(stickY);
-    // Serial.println("");
-    // Serial.flush();
-    // _debugLedState = !_debugLedState;
-    // digitalWrite(LED_PIN, _debugLedState ? HIGH : LOW);
-    // vTaskDelay(250);
+    vTaskDelay(configTICK_RATE_HZ / 32);
   } else {
-    vTaskDelay(configTICK_RATE_HZ / 64 / 2);
     
     readMotionCount++;
     if (readMotionCount >= 2)
@@ -239,14 +249,31 @@ void loop()
 
 #ifndef SH_CONTROLLER_PRODUCTION
       if (loopCount % (64 * 2) == 0) {
-        Serial.print("Stick X=");
+        for (int i = 0; i < 12; i++) {
+          if (ButtonIsOn(i)) {
+            Serial.print("1");
+          } else {
+            Serial.print("0");
+          }
+        }
+
+        Serial.print(" Stick X=");
         Serial.print(StickValue(0, TwoDimension::X), 3);
         Serial.print(" Y=");
         Serial.print(StickValue(0, TwoDimension::Y), 3);
         Serial.println("");
-        Serial.flush();
+
+        // gyro.read();
+        // auto readEndTick = xTaskGetTickCount();
+        // Serial.print("X: "); Serial.print((int)gyro.data.x);   Serial.print(" ");
+        // Serial.print("Y: "); Serial.print((int)gyro.data.y);   Serial.print(" ");
+        // Serial.print("Z: "); Serial.println((int)gyro.data.z); Serial.print(" ");
+        // Serial.println("");
+        // Serial.flush();
       }
 #endif
     }
+    auto tickCountDiff = xTaskGetTickCount() - localStartTickCount;
+    vTaskDelay(configTICK_RATE_HZ / 64 / 2 - tickCountDiff);
   }
 }

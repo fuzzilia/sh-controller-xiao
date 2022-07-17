@@ -38,8 +38,7 @@ void printSendKey(const KeyboardValue &key)
     {
         Serial.print("[gui]");
     }
-    Serial.print(key.keyCode());
-    Serial.print("\n");
+    Serial.println(key.keyCode());
 }
 
 void sendKey(KeyboardValue key)
