@@ -1,6 +1,21 @@
 #include "SHController.h"
 #include <cmath>
 
+#define MAX_KEY_NUM 32
+
+static void PushKeys(std::queue<KeyboardValue> &keys, KeyboardValue key) {
+    if (keys.size() < MAX_KEY_NUM - 1) {
+        keys.push(key);
+    }
+}
+
+static void PushKeys(std::queue<KeyboardValue> &keys, KeyboardValue key1, KeyboardValue key2) {
+    if (keys.size() < MAX_KEY_NUM - 2) {
+        keys.push(key1);
+        keys.push(key2);
+    }
+}
+
 void SHController::ProcessRotationState::Reset() {
     m_last_direction = 0;
     m_first_direction = 0;
@@ -37,17 +52,15 @@ int SHController::ProcessRotationState::ProcessWithRelativeRotate(float rotate) 
 }
 
 void
-ProcessCountDiff(std::vector<KeyboardValue> &keys, int count_diff, const PositiveAndNegative<KeyboardValue> &config) {
+ProcessCountDiff(std::queue<KeyboardValue> &keys, int count_diff, const PositiveAndNegative<KeyboardValue> &config) {
     if (config.positive) {
         for (int i = 0; i < count_diff; i++) {
-            keys.push_back(config.positive);
-            keys.push_back(KeyboardValue());
+            PushKeys(keys, config.positive, KeyboardValue());
         }
     }
     if (config.negative) {
         for (int i = 0; i < -count_diff; i++) {
-            keys.push_back(config.negative);
-            keys.push_back(KeyboardValue());
+            PushKeys(keys, config.negative, KeyboardValue());
         }
     }
 }
@@ -70,7 +83,7 @@ SHController::ProcessRotationState::LockedAxis(const ThreeDimensionValue<Process
     return NullableThreeDimension::Z;
 }
 
-std::vector<KeyboardValue> SHController::tick() {
+void SHController::tick(std::queue<KeyboardValue> &keys) {
     uint8_t combination_state = 0;
     for (uint8_t button_index = 0; button_index < m_config->CombinationButtonNumbers().size(); button_index++) {
         if (m_read_button_is_on(m_config->CombinationButtonNumbers()[button_index])) {
@@ -90,13 +103,12 @@ std::vector<KeyboardValue> SHController::tick() {
         }
     }
 
-    std::vector<KeyboardValue> keys;
     bool button_state_changed = false;
 
     if (combination_state != m_last_combination_state || button_number != m_last_button_number) {
         if (m_last_keyboard_value) {
             m_last_keyboard_value = KeyboardValue();
-            keys.emplace_back();
+            PushKeys(keys, m_last_keyboard_value);
         }
         button_state_changed = true;
     }
@@ -113,16 +125,16 @@ std::vector<KeyboardValue> SHController::tick() {
                 if (button_state_changed) {
                     const auto keyboardValue = button.GetKeyboardValue();
                     m_last_keyboard_value = keyboardValue;
-                    keys.push_back(keyboardValue);
+                    PushKeys(keys, keyboardValue);
                 }
-                return keys;
+                return;
 
             case ButtonBlockType::Gesture:
                 if (button_state_changed) {
                     // TODO MotionGestureStateの定義に合わせて初期化処理
                     m_state.motion_gesture = {};
                 }
-                return keys;
+                return;
 
             case ButtonBlockType::Rotation:
                 if (button_state_changed) {
@@ -136,7 +148,7 @@ std::vector<KeyboardValue> SHController::tick() {
                     };
                 }
                 ProcessButtonRotation(keys, m_config->RotateButtonConfigAt(button.ReferenceIndex()));
-                return keys;
+                return;
         }
     }
 
@@ -161,8 +173,8 @@ std::vector<KeyboardValue> SHController::tick() {
                 case StickBlockType::FourButton:
                 case StickBlockType::EightButton:
                     if (m_last_keyboard_value) {
-                        keys.emplace_back();
                         m_last_keyboard_value = KeyboardValue();
+                        PushKeys(keys, m_last_keyboard_value);
                     }
                     break;
             }
@@ -179,9 +191,9 @@ std::vector<KeyboardValue> SHController::tick() {
                 const long index = lroundf(normalized_angle * 4) % 4;
                 const auto key = config.keys[index];
                 if (key && key != m_last_keyboard_value) {
-                    keys.push_back(key);
+                    PushKeys(keys, key);
                     m_last_keyboard_value = key;
-                    return keys;
+                    return;
                 }
                 break;
             }
@@ -191,9 +203,9 @@ std::vector<KeyboardValue> SHController::tick() {
                 const long index = lroundf(normalized_angle * 8) % 8;
                 const auto key = config.keys[index];
                 if (key && key != m_last_keyboard_value) {
-                    keys.push_back(key);
+                    PushKeys(keys, key);
                     m_last_keyboard_value = key;
-                    return keys;
+                    return;
                 }
                 break;
             }
@@ -225,10 +237,10 @@ std::vector<KeyboardValue> SHController::tick() {
         }
     }
 
-    return keys;
+    return;
 }
 
-void SHController::ProcessButtonRotation(std::vector<KeyboardValue> &keys, const SHConfig::RotateButtonConfig &config) {
+void SHController::ProcessButtonRotation(std::queue<KeyboardValue> &keys, const SHConfig::RotateButtonConfig &config) {
     auto sensor_values = m_read_motion_sensor_values();
     ThreeDimensionValue<float> adding_rotation = {.x = 0, .y = 0, .z = 0};
     auto locked_axis = m_state.rotate_motion.locked_axis;
@@ -283,7 +295,7 @@ void SHController::ProcessButtonRotation(std::vector<KeyboardValue> &keys, const
     ProcessCountDiff(keys, z_diff, config.rotate.z);
 }
 
-void SHController::ProcessButtonGesture(std::vector<KeyboardValue> &keys, const SHConfig::GestureButtonConfig &config) {
+void SHController::ProcessButtonGesture(std::queue<KeyboardValue> &keys, const SHConfig::GestureButtonConfig &config) {
     // TODO 実装
 }
 

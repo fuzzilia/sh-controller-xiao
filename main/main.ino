@@ -16,6 +16,7 @@
 #include "nrf_rng.h"
 #include "nrf_soc.h"
 #include "Common.h"
+#include <queue>
 
 #define FRAME_PER_SEC 60
 #define READ_MOTION_PER_FRAME 3
@@ -36,6 +37,9 @@ static SHController *sh_controller = nullptr;
 static bool isConfigMode = false;
 static portTickType startTick;
 static bool isGyroEnabled = false;
+
+static TaskHandle_t sendKeyTaskHandle;
+static std::queue<KeyboardValue> sendingKeys;
 
 std::vector<MotionSensorValue> MotionSensorValues()
 {
@@ -149,6 +153,19 @@ static void OnDisconnect(uint16_t connectionHandle, uint8_t reason) {
   led.disableEndressBlinkBrightPattern(LEDIndicator::EndressBlinkPattern::Full);
 }
 
+static void SendKeyTask(void *arg)
+{
+  (void) arg;
+
+  while (true) {
+    while (!sendingKeys.empty()) {
+      sendKey(sendingKeys.front());
+      sendingKeys.pop();
+    }
+    vTaskDelay(configTICK_RATE_HZ / 64);
+  }
+}
+
 void setup()
 {
   strip.begin();
@@ -221,6 +238,8 @@ void setup()
   //   }
   // }
 
+  xTaskCreate(SendKeyTask, "SendKeyTask", 1024, nullptr, TASK_PRIO_LOW, &sendKeyTaskHandle);
+
   DEBUG_PRINT("start");
   startTick = xTaskGetTickCount();
 }
@@ -240,12 +259,10 @@ void loop()
     readMotionCount++;
     if (readMotionCount >= 2)
     {
-      RefreshStickValue();
-      auto keys = sh_controller->tick();
-      for (auto key : keys) {
-        sendKey(key);
-      }
       readMotionCount = 0;
+
+      RefreshStickValue();
+      sh_controller->tick(sendingKeys);
 
 #ifndef SH_CONTROLLER_PRODUCTION
       if (loopCount % (64 * 2) == 0) {
@@ -274,6 +291,9 @@ void loop()
 #endif
     }
     auto tickCountDiff = xTaskGetTickCount() - localStartTickCount;
-    vTaskDelay(configTICK_RATE_HZ / 64 / 2 - tickCountDiff);
+    auto delayTickCount = configTICK_RATE_HZ / 64 / 2 - tickCountDiff;
+    if (delayTickCount > 0) {
+      vTaskDelay(delayTickCount);
+    }
   }
 }

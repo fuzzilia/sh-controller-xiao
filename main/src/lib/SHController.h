@@ -3,6 +3,8 @@
 
 #include "SHConfig.h"
 
+#include <queue>
+
 typedef bool (*ReadButtonIsOn)(int button_index);
 
 typedef float (*ReadStickValue)(int button_index, TwoDimension dimension);
@@ -77,14 +79,14 @@ public:
             m_read_stick_value(read_stick_value),
             m_read_motion_sensor_values(m_read_motion_sensor_values) {}
 
-    std::vector<KeyboardValue> tick();
+    void tick(std::queue<KeyboardValue> &keys);
 
     const SHConfig &config() const;
 
 private:
-    void ProcessButtonRotation(std::vector<KeyboardValue> &keys, const SHConfig::RotateButtonConfig &config);
+    void ProcessButtonRotation(std::queue<KeyboardValue> &keys, const SHConfig::RotateButtonConfig &config);
 
-    void ProcessButtonGesture(std::vector<KeyboardValue> &keys, const SHConfig::GestureButtonConfig &config);
+    void ProcessButtonGesture(std::queue<KeyboardValue> &keys, const SHConfig::GestureButtonConfig &config);
 };
 
 
