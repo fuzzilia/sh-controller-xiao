@@ -1,12 +1,9 @@
-#include <Adafruit_MPR121.h>
-#include <Adafruit_DotStar.h>
-#include <Adafruit_L3GD20_U.h>
+
 #include <bluefruit.h>
 #include <InternalFileSystem.h>
 #include <array>
 #include "FreeRTOS.h"
 #include "src/lib/SHController.h"
-#include "CL3GD20.h"
 #include "ConfigLoader.h"
 #include "KeyService.h"
 #include "KeyConfigService.h"
@@ -23,10 +20,6 @@
 #define LED_PIN 13
 #define GYRO_SENSOR_ADDRESS 0x6A
 static float READ_MOTION_PERIOD_MS = 1.0f / FRAME_PER_SEC / READ_MOTION_PER_FRAME;
-
-static Adafruit_DotStar strip(1, PIN_DOTSTAR_DATA, PIN_DOTSTAR_CLOCK, DOTSTAR_BRG);
-
-static Adafruit_L3GD20 gyro = Adafruit_L3GD20();
 
 BLEDis bledis;
 LEDIndicator led(LED_PIN);
@@ -83,14 +76,14 @@ static void showMode(bool isConfigMode)
   if (isConfigMode)
   {
     DEBUG_PRINT("config mode");
-    strip.setPixelColor(0, 0, 0, 120);
+    // strip.setPixelColor(0, 0, 0, 120);
   }
   else
   {
     DEBUG_PRINT("key mode");
-    strip.setPixelColor(0, 0, 120, 0);
+    // strip.setPixelColor(0, 0, 120, 0);
   }
-  strip.show();
+  // strip.show();
 }
 
 static void startAdv(void)
@@ -168,10 +161,6 @@ static void SendKeyTask(void *arg)
 
 void setup()
 {
-  strip.begin();
-  strip.setBrightness(2);
-  strip.show();
-
 #ifndef SH_CONTROLLER_PRODUCTION
   Serial.begin(115200);
   while (!Serial)
@@ -184,8 +173,6 @@ void setup()
   pinMode(LED_PIN, OUTPUT);
 
   InternalFS.begin();
-  strip.setPixelColor(0, 255, 255, 0);
-  strip.show();
   isConfigMode = ConfigButtonIsOn();
 
   showMode(isConfigMode);
