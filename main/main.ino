@@ -7,9 +7,9 @@
 #include "ConfigLoader.h"
 #include "KeyService.h"
 #include "KeyConfigService.h"
-#include "ButtonMatrix.h"
+#include "ButtonManager.h"
 #include "AnalogStick.h"
-#include "LEDIndicator.h"
+#include "FullColorLEDIndicator.h"
 #include "nrf_rng.h"
 #include "nrf_soc.h"
 #include "Common.h"
@@ -19,10 +19,12 @@
 #define READ_MOTION_PER_FRAME 3
 #define LED_PIN 13
 #define GYRO_SENSOR_ADDRESS 0x6A
+static const int TICK_COUNT_PER_SECONDS = 64 * 2;
 static float READ_MOTION_PERIOD_MS = 1.0f / FRAME_PER_SEC / READ_MOTION_PER_FRAME;
 
 BLEDis bledis;
-LEDIndicator led(LED_PIN);
+// LEDIndicator led(LED_PIN);
+FullColorLEDIndicator led(std::array<uint8_t, 3>{LED_RED, LED_GREEN, LED_BLUE});
 
 static int readMotionCount = 0;
 
@@ -47,12 +49,14 @@ static void GenerateRandomAddress(ble_gap_addr_t &addr)
 {
   addr.addr_id_peer = 0;
   addr.addr_type = BLE_GAP_ADDR_TYPE_RANDOM_STATIC;
-  for (int i = 0; i < BLE_GAP_ADDR_LEN; i++) {
+  for (int i = 0; i < BLE_GAP_ADDR_LEN; i++)
+  {
     addr.addr[i] = 0;
   }
 
   uint8_t availableBytes;
-  do {
+  do
+  {
     DEBUG_PRINT("generating...");
     delay(1);
     sd_rand_application_bytes_available_get(&availableBytes);
@@ -62,7 +66,8 @@ static void GenerateRandomAddress(ble_gap_addr_t &addr)
 
 #ifndef SH_CONTROLLER_PRODUCTION
   Serial.println("generated.");
-  for (int i = 0; i < BLE_GAP_ADDR_LEN; i++) {
+  for (int i = 0; i < BLE_GAP_ADDR_LEN; i++)
+  {
     Serial.print(":");
     Serial.println(addr.addr[i], HEX);
   }
@@ -117,41 +122,45 @@ static void startAdv(void)
    * - Interval:  fast mode = 20 ms, slow mode = 152.5 ms
    * - Timeout for fast mode is 30 seconds
    * - Start(timeout) with timeout = 0 will advertise forever (until connected)
-   * 
+   *
    * For recommended advertising interval
-   * https://developer.apple.com/library/content/qa/qa1931/_index.html   
+   * https://developer.apple.com/library/content/qa/qa1931/_index.html
    */
   Bluefruit.Advertising.restartOnDisconnect(true);
   Bluefruit.Advertising.setInterval(32, 244); // in unit of 0.625 ms
   Bluefruit.Advertising.setFastTimeout(30);   // number of seconds in fast mode
   bool isOk = Bluefruit.Advertising.start(0);
-  if (isOk) {
+  if (isOk)
+  {
     DEBUG_PRINT("start adv.");
-  } else {
+  }
+  else
+  {
     DEBUG_PRINT("adv failed.");
   }
 }
 
-static void OnConnect(uint16_t connectionHandle) {
+static void OnConnect(uint16_t connectionHandle)
+{
   DEBUG_PRINT("on connect");
-  led.disableEndressBlinkBrightPattern(LEDIndicator::EndressBlinkPattern::Short);
-  led.enableEndressBlinkBrightPattern(LEDIndicator::EndressBlinkPattern::Full);
-  led.addSingleBlink(3);
+  led.Connected();
 }
 
-static void OnDisconnect(uint16_t connectionHandle, uint8_t reason) {
+static void OnDisconnect(uint16_t connectionHandle, uint8_t reason)
+{
   DEBUG_PRINT("on disconnect");
   DEBUG_PRINT(reason);
-  led.enableEndressBlinkBrightPattern(LEDIndicator::EndressBlinkPattern::Short);
-  led.disableEndressBlinkBrightPattern(LEDIndicator::EndressBlinkPattern::Full);
+  led.Disconnected();
 }
 
 static void SendKeyTask(void *arg)
 {
-  (void) arg;
+  (void)arg;
 
-  while (true) {
-    while (!sendingKeys.empty()) {
+  while (true)
+  {
+    while (!sendingKeys.empty())
+    {
       sendKey(sendingKeys.front());
       sendingKeys.pop();
     }
@@ -161,28 +170,32 @@ static void SendKeyTask(void *arg)
 
 void setup()
 {
+  analogReadResolution(12);
+  // InitPinsForButton();
+  InitButtons();
+  // InitPinsForStick();
+  // pinMode(LED_PIN, OUTPUT);
+  led.InitPins();
+
+  analogWrite(LED_RED, 0);
+
 #ifndef SH_CONTROLLER_PRODUCTION
   Serial.begin(115200);
   while (!Serial)
     delay(10); // for nrf52840 with native usb
 #endif
 
-  analogReadResolution(12);
-  InitPinsForButton();
-  InitPinsForStick();
-  pinMode(LED_PIN, OUTPUT);
-
   InternalFS.begin();
   isConfigMode = ConfigButtonIsOn();
 
   showMode(isConfigMode);
-  if (isConfigMode) {
-    led.beginEndressBlink(configTICK_RATE_HZ * 3);
-    led.enableEndressBlinkBrightPattern(LEDIndicator::EndressBlinkPattern::Wave);
-  } else {
-    led.beginEndressBlink(configTICK_RATE_HZ * 1.5);
-    led.initSingleBlink(configTICK_RATE_HZ * 0.8);
-    led.enableEndressBlinkBrightPattern(LEDIndicator::EndressBlinkPattern::Short);
+  if (isConfigMode)
+  {
+    led.StartConfigMode();
+  }
+  else
+  {
+    led.StartStandardMode();
   }
 
   DEBUG_PRINT("start load");
@@ -209,21 +222,6 @@ void setup()
   bledis.begin();
 
   startAdv();
-  // if (!isConfigMode)
-  // // if (!isConfigMode && sh_controller->config().NeedsSensorInput())
-  // {
-  //   DEBUG_PRINT("initialize gyro.");
-
-  //   // アドレス設定がAdafruit_L3GD20_Unifiedの前提と異なっているので、Adafruit_L3GD20_Unifiedは使わずAdafruit_L3GD20を使う方針
-  //   // だが、Adafruit_L3GD20内で利用している_i2cをAdafruit_L3GD20経由で初期化する方法が無いので、
-  //   // Adafruit_L3GD20_Unifiedのbeginメソッドを利用して初期化する。
-  //   Adafruit_L3GD20_Unified gyroForInit;
-  //   gyroForInit.begin();
-  //   auto isGyroEnabled = gyro.begin(GYRO_RANGE_250DPS, GYRO_SENSOR_ADDRESS);
-  //   if (!isGyroEnabled) {
-  //     DEBUG_PRINT("fail to initialize gyro.");
-  //   }
-  // }
 
   xTaskCreate(SendKeyTask, "SendKeyTask", 1024, nullptr, TASK_PRIO_LOW, &sendKeyTaskHandle);
 
@@ -237,12 +235,14 @@ void loop()
 {
   loopCount++;
   auto localStartTickCount = xTaskGetTickCount();
-  led.tick(localStartTickCount);
-  if (isConfigMode) {
+  led.Tick();
+  if (isConfigMode)
+  {
     DEBUG_PRINT("config...");
-    vTaskDelay(configTICK_RATE_HZ / 32);
-  } else {
-    
+  }
+  else
+  {
+
     readMotionCount++;
     if (readMotionCount >= 2)
     {
@@ -252,11 +252,16 @@ void loop()
       sh_controller->tick(sendingKeys);
 
 #ifndef SH_CONTROLLER_PRODUCTION
-      if (loopCount % (64 * 2) == 0) {
-        for (int i = 0; i < 12; i++) {
-          if (ButtonIsOn(i)) {
+      if (loopCount % TICK_COUNT_PER_SECONDS == 0)
+      {
+        for (int i = 0; i < 12; i++)
+        {
+          if (ButtonIsOn(i))
+          {
             Serial.print("1");
-          } else {
+          }
+          else
+          {
             Serial.print("0");
           }
         }
@@ -277,10 +282,11 @@ void loop()
       }
 #endif
     }
-    auto tickCountDiff = xTaskGetTickCount() - localStartTickCount;
-    auto delayTickCount = configTICK_RATE_HZ / 64 / 2 - tickCountDiff;
-    if (delayTickCount > 0) {
-      vTaskDelay(delayTickCount);
-    }
+  }
+  auto tickCountDiff = xTaskGetTickCount() - localStartTickCount;
+  auto delayTickCount = configTICK_RATE_HZ / TICK_COUNT_PER_SECONDS - tickCountDiff;
+  if (delayTickCount > 0)
+  {
+    vTaskDelay(delayTickCount);
   }
 }

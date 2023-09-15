@@ -11,4 +11,4 @@ arduino-cli compile -b $FQBN \
   --build-property compiler.c.elf.cmd=arm-none-eabi-g++ \
   --build-property "build.extra_flags=$ORIGINAL_EXTRA_FLAGS -DSH_CONTROLLER_PRODUCTION" \
   --build-path out
-uf2conv.py -c out/main.ino.hex --out out/sh-controller-nrf52.uf2 --family 0xADA52840
+uf2conv.py -c out/main.ino.hex --out out/sh-controller-nrf52-xiao.uf2 --family 0xADA52840
