@@ -1,3 +1,7 @@
+#! /bin/bash
+
+set -e
+
 cp shells/install.sh build-docker/
 docker build ./build-docker -t sh-controller-nrf52-xiao-builder
 

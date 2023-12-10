@@ -28,7 +28,7 @@ static void onWriteKeyConfig(uint16_t handle, BLECharacteristic *characteristic,
 #endif
         {
             SHConfig config(data, ConfigLoader::validKeypadIds());
-            
+
             if (!config.isValid())
             {
 #ifndef SH_CONTROLLER_PRODUCTION
@@ -39,6 +39,14 @@ static void onWriteKeyConfig(uint16_t handle, BLECharacteristic *characteristic,
 
                 // 本当はBLEレベルでの書き込み失敗扱いにしたいが、ライブラリの作りの問題で不可能っぽい
                 return;
+            }
+            else
+            {
+#ifndef SH_CONTROLLER_PRODUCTION
+                auto configString = config.ToString();
+                Serial.println(configString.c_str());
+                Serial.flush();
+#endif
             }
         }
 

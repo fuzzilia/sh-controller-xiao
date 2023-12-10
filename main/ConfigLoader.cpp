@@ -13,9 +13,15 @@ static File file(InternalFS);
 static uint8_t buffer[512] = {0};
 static bool loaded = false;
 
-static std::vector<KeypadId> _validKeypadIds = {KeypadId::ShControllerNrf52};
+static std::vector<KeypadId> _validKeypadIds = {
+    KeypadId::ShControllerNrf52XiaoR,
+    KeypadId::ShControllerNrf52XiaoL,
+    KeypadId::ShControllerNrf52XiaoSenseR,
+    KeypadId::ShControllerNrf52XiaoSenseL,
+};
 
-const std::vector<KeypadId> &ConfigLoader::validKeypadIds() {
+const std::vector<KeypadId> &ConfigLoader::validKeypadIds()
+{
     return _validKeypadIds;
 }
 

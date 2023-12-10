@@ -1,5 +1,7 @@
-#ifndef SH_CONTROLLER_BUTTON_MANAGER_H
-#define SH_CONTROLLER_BUTTON_MANAGER_H
+#ifndef SH_CONTROLLER_INPUT_H
+#define SH_CONTROLLER_INPUT_H
+
+#include "src/lib/SHValue.h"
 
 /**
  * @brief 指定された番号のボタンが押されているかどうかを返します。
@@ -11,10 +13,9 @@
 bool ButtonIsOn(int index);
 
 /**
- * @brief ボタンのピン設定を行います。
- *
+ * @brief 入力機能のための各種初期化を行います。
  */
-void InitButtons();
+void InitializeInput();
 
 /**
  * @brief 設定ボタンが押されているかどうかを返します。
@@ -24,4 +25,8 @@ void InitButtons();
  */
 bool ConfigButtonIsOn();
 
-#endif // SH_CONTROLLER_BUTTON_MANAGER_H
+void RefreshInput();
+
+float StickValue(int, TwoDimension dimension);
+
+#endif // SH_CONTROLLER_INPUT_H

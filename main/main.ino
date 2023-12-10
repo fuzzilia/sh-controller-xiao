@@ -7,8 +7,7 @@
 #include "ConfigLoader.h"
 #include "KeyService.h"
 #include "KeyConfigService.h"
-#include "ButtonManager.h"
-#include "AnalogStick.h"
+#include "Input.h"
 #include "FullColorLEDIndicator.h"
 #include "nrf_rng.h"
 #include "nrf_soc.h"
@@ -171,10 +170,7 @@ static void SendKeyTask(void *arg)
 void setup()
 {
   analogReadResolution(12);
-  // InitPinsForButton();
-  InitButtons();
-  // InitPinsForStick();
-  // pinMode(LED_PIN, OUTPUT);
+  InitializeInput();
   led.InitPins();
 
   analogWrite(LED_RED, 0);
@@ -229,6 +225,70 @@ void setup()
   startTick = xTaskGetTickCount();
 }
 
+void PrintStickValueAsBar(float value)
+{
+  static const float maxValue = 1.2;
+  static const int steps = 12;
+
+  Serial.print(" ");
+  for (int i = 0; i < steps; i++)
+  {
+    if (value < (i + 1 - steps) * (maxValue / steps))
+    {
+      Serial.print("-");
+    }
+    else
+    {
+      Serial.print(" ");
+    }
+  }
+  Serial.print("|");
+  for (int i = 0; i < steps; i++)
+  {
+    if (value > i * (maxValue / steps))
+    {
+      Serial.print("+");
+    }
+    else
+    {
+      Serial.print(" ");
+    }
+  }
+  Serial.print(" ");
+}
+
+void PrintInputState()
+{
+  for (int i = 0; i < 12; i++)
+  {
+    if (ButtonIsOn(i))
+    {
+      Serial.print("1");
+    }
+    else
+    {
+      Serial.print("0");
+    }
+  }
+
+  // Serial.print(" Stick X=");
+  // Serial.print(StickValue(0, TwoDimension::X), 3);
+  // Serial.print(" Y=");
+  // Serial.print(StickValue(0, TwoDimension::Y), 3);
+  PrintStickValueAsBar(StickValue(0, TwoDimension::X));
+  PrintStickValueAsBar(StickValue(0, TwoDimension::Y));
+  Serial.println("");
+  Serial.flush();
+
+  // gyro.read();
+  // auto readEndTick = xTaskGetTickCount();
+  // Serial.print("X: "); Serial.print((int)gyro.data.x);   Serial.print(" ");
+  // Serial.print("Y: "); Serial.print((int)gyro.data.y);   Serial.print(" ");
+  // Serial.print("Z: "); Serial.println((int)gyro.data.z); Serial.print(" ");
+  // Serial.println("");
+  // Serial.flush();
+}
+
 static int loopCount = 0;
 
 void loop()
@@ -238,7 +298,11 @@ void loop()
   led.Tick();
   if (isConfigMode)
   {
-    DEBUG_PRINT("config...");
+    if (loopCount % (TICK_COUNT_PER_SECONDS * 2) == 0)
+    {
+      DEBUG_PRINT("config...");
+      DEBUG_PRINT(loopCount);
+    }
   }
   else
   {
@@ -248,37 +312,13 @@ void loop()
     {
       readMotionCount = 0;
 
-      RefreshStickValue();
+      RefreshInput();
       sh_controller->tick(sendingKeys);
 
 #ifndef SH_CONTROLLER_PRODUCTION
-      if (loopCount % TICK_COUNT_PER_SECONDS == 0)
+      if (loopCount % (TICK_COUNT_PER_SECONDS / 8) == 0)
       {
-        for (int i = 0; i < 12; i++)
-        {
-          if (ButtonIsOn(i))
-          {
-            Serial.print("1");
-          }
-          else
-          {
-            Serial.print("0");
-          }
-        }
-
-        Serial.print(" Stick X=");
-        Serial.print(StickValue(0, TwoDimension::X), 3);
-        Serial.print(" Y=");
-        Serial.print(StickValue(0, TwoDimension::Y), 3);
-        Serial.println("");
-
-        // gyro.read();
-        // auto readEndTick = xTaskGetTickCount();
-        // Serial.print("X: "); Serial.print((int)gyro.data.x);   Serial.print(" ");
-        // Serial.print("Y: "); Serial.print((int)gyro.data.y);   Serial.print(" ");
-        // Serial.print("Z: "); Serial.println((int)gyro.data.z); Serial.print(" ");
-        // Serial.println("");
-        // Serial.flush();
+        PrintInputState();
       }
 #endif
     }

@@ -4,7 +4,7 @@
 
 static const Color DEFAULT_COLOR = Color{0, 0, 0};
 static const Color CONFIG_COLOR = Color{0xFF, 0x00, 0xFF};
-static const Color STANDARD_COLOR = Color{0x00, 0x00, 0xFF};
+static const Color STANDARD_COLOR = Color{0xFF, 0xFF, 0xFF};
 static const Color MODE1_COLOR = Color{0x00, 0xFF, 0x00};
 
 static std::unique_ptr<FullColorLEDPattern> MakeStandardAdvertizingPattern()
