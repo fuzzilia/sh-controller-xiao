@@ -1,4 +1,5 @@
 #include "Input.h"
+#include "Common.h"
 #include <array>
 #include <Arduino.h>
 #include <Wire.h>
@@ -90,5 +91,5 @@ void RefreshInput()
 
 bool ConfigButtonIsOn()
 {
-    return ButtonIsOn(CONFIG_BUTTON_INDEX);
+    return ButtonIsOn(0) || ButtonIsOn(1);
 }

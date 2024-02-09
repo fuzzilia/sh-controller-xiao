@@ -13,6 +13,7 @@
 #include "nrf_soc.h"
 #include "Common.h"
 #include <queue>
+#include "LSM6DS3.h"
 
 #define FRAME_PER_SEC 60
 #define READ_MOTION_PER_FRAME 3
@@ -35,12 +36,14 @@ static bool isGyroEnabled = false;
 static TaskHandle_t sendKeyTaskHandle;
 static std::queue<KeyboardValue> sendingKeys;
 
+LSM6DS3 imu(I2C_MODE, 0x6A);
+
+ThreeDimensionValue<float> lastGyroValue = {.x = 0.0f, .y = 0.0f, .z = 0.0f};
+
 std::vector<MotionSensorValue> MotionSensorValues()
 {
   return {
-      MotionSensorValue{.time_span_s = 1.0f / 60 / 3, .gyro = {.x = 0.0f, .y = 0.0f, .z = 0.0f}},
-      MotionSensorValue{.time_span_s = 1.0f / 60 / 3, .gyro = {.x = 0.0f, .y = 0.0f, .z = 0.0f}},
-      MotionSensorValue{.time_span_s = 1.0f / 60 / 3, .gyro = {.x = 0.0f, .y = 0.0f, .z = 0.0f}},
+      MotionSensorValue{.time_span_s = 1.0f / 60, .gyro = lastGyroValue},
   };
 }
 
@@ -182,6 +185,14 @@ void setup()
 #endif
 
   InternalFS.begin();
+  if (imu.begin() != 0)
+  {
+    DEBUG_PRINT("IMU Error");
+  }
+  else
+  {
+    DEBUG_PRINT("IMU Begin");
+  }
   isConfigMode = ConfigButtonIsOn();
 
   showMode(isConfigMode);
@@ -257,6 +268,8 @@ void PrintStickValueAsBar(float value)
   Serial.print(" ");
 }
 
+static int minusCount = 0;
+
 void PrintInputState()
 {
   for (int i = 0; i < 12; i++)
@@ -277,6 +290,17 @@ void PrintInputState()
   // Serial.print(StickValue(0, TwoDimension::Y), 3);
   PrintStickValueAsBar(StickValue(0, TwoDimension::X));
   PrintStickValueAsBar(StickValue(0, TwoDimension::Y));
+
+  // Serial.print("minusCount=");
+  // Serial.print(minusCount);
+
+  Serial.print(" X=");
+  Serial.print(lastGyroValue.x, 4);
+  Serial.print(" Y=");
+  Serial.print(lastGyroValue.y, 4);
+  Serial.print(" Z=");
+  Serial.print(lastGyroValue.z, 4);
+
   Serial.println("");
   Serial.flush();
 
@@ -313,6 +337,11 @@ void loop()
       readMotionCount = 0;
 
       RefreshInput();
+
+      lastGyroValue.x = imu.readFloatGyroX() / 300;
+      lastGyroValue.y = imu.readFloatGyroY() / 300;
+      lastGyroValue.z = imu.readFloatGyroZ() / 300;
+
       sh_controller->tick(sendingKeys);
 
 #ifndef SH_CONTROLLER_PRODUCTION
@@ -328,5 +357,9 @@ void loop()
   if (delayTickCount > 0)
   {
     vTaskDelay(delayTickCount);
+  }
+  else
+  {
+    minusCount -= delayTickCount;
   }
 }

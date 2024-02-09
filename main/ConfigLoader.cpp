@@ -70,7 +70,7 @@ std::unique_ptr<SHConfig> ConfigLoader::load()
     else
     {
         DEBUG_PRINT("config dosen't exist. use default config.");
-        return SHConfig::defaultConfig(KeypadId::ShControllerNrf52);
+        return SHConfig::defaultConfig(KeypadId::ShControllerNrf52XiaoL);
     }
 }
 
